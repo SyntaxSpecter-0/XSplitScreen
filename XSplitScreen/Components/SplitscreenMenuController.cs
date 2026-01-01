@@ -351,7 +351,7 @@ namespace Dodad.XSplitscreen.Components
             }
         }
 
-        private void CreateUI()
+		private void CreateUI()
 		{
 			var mainPanel = transform.Find("Main Panel");
 			var localUserPanel = mainPanel.Find("User Panel");
@@ -367,14 +367,18 @@ namespace Dodad.XSplitscreen.Components
 			if (monitorId != 0)
 			{
 				Destroy(notificationGroup.gameObject);
-
+				Log.Print($"[SplitscreenMenuController::CreateUI] Returning with 'monitorId' = '{monitorId}'");
 				return;
 			}
 
 			var backPanelTemplate = MainMenuController.instance.extraGameModeMenuScreen.transform.Find("Main Panel/BackPanel");
 			var menuButtonPanelTemplate = MainMenuController.instance.extraGameModeMenuScreen.transform.Find("Main Panel/GenericMenuButtonPanel");
 
-			if (backPanelTemplate == null || menuButtonPanelTemplate == null) return;
+
+			if (backPanelTemplate == null || menuButtonPanelTemplate == null)
+			{
+				return;
+			}
 
 			var backPanelClone = Instantiate(backPanelTemplate.gameObject);
 			var backPanelRect = backPanelClone.GetComponent<RectTransform>();
@@ -427,7 +431,7 @@ namespace Dodad.XSplitscreen.Components
 			{
 				Application.OpenURL("https://discord.gg/maHhJSv62G");
 			});
-
+			discordButton.gameObject.SetActive(true);
 
 			// Remove extra buttons
 			foreach (Transform child in menuButtonPanelRect.Find("JuicePanel"))
@@ -438,6 +442,7 @@ namespace Dodad.XSplitscreen.Components
 				Destroy(child.gameObject);
 			}
 
+			// Gamemodes
 			var gameModeButtonTemplate = MainMenuController.instance.multiplayerMenuScreen.transform.Find("Inner90/MainMultiplayerMenu/GenericMenuButtonPanel/JuicePanel/GameMode");
 			gameModeButton = Instantiate((gameModeButtonTemplate.gameObject)).GetComponent<HGButton>();
 			gameModeButton.hoverLanguageTextMeshController = menuButtonPanelRect.Find("JuicePanel/DescriptionPanel, Naked/ContentSizeFitter/DescriptionText").GetComponent<LanguageTextMeshController>();
@@ -453,6 +458,7 @@ namespace Dodad.XSplitscreen.Components
 			gameModeButton.GetComponent<MPEventSystemLocator>().Awake();
 			Destroy(gameModeButton.transform.Find("Canvas").gameObject);
 			
+			// Multi monitor
 			multiMonitorButton = Instantiate(discordButton.gameObject).GetComponent<HGButton>();
 			multiMonitorButton.transform.SetParent(discordButton.transform.parent);
 			multiMonitorButton.transform.localScale = Vector3.one;
@@ -467,6 +473,7 @@ namespace Dodad.XSplitscreen.Components
 				EnableMultiMonitorMode();
 				multiMonitorButton.interactable = false;
 			});
+			multiMonitorButton.gameObject.SetActive(true);
 
 			int displayCount = Display.displays.Length;
 			multiMonitorButton.interactable = displayCount != 1 && !Enumerable.Range(1, displayCount - 1).Any(i => Display.displays[i].active);
@@ -498,6 +505,7 @@ namespace Dodad.XSplitscreen.Components
 					EventSystem.current.SetSelectedGameObject(null);
 				}
 			});
+			creditsButton.gameObject.SetActive(true);
 
 			// Link buttons navigation
 			var creditsNav = creditsButton.navigation;
@@ -568,55 +576,6 @@ namespace Dodad.XSplitscreen.Components
 
 				notificationGroup.transform.Find("W2").gameObject.AddComponent<PhasingGraphicColor>();
 
-				/*var notificationPanel = transform.Find("Notification Panel").transform;
-
-				var infoContainer = new GameObject("Info");
-				infoContainer.transform.SetParent(notificationPanel);
-				var infoRect = infoContainer.AddComponent<RectTransform>();
-				infoRect.transform.localPosition = Vector3.zero;
-				infoRect.transform.localScale = Vector3.one;
-				infoRect.anchorMin = Vector2.zero;
-				infoRect.anchorMax = Vector2.one;
-
-				var infoLayout = infoContainer.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
-				infoLayout.childAlignment = TextAnchor.MiddleCenter;
-				infoLayout.childForceExpandWidth = false;
-				infoLayout.childForceExpandHeight = false;
-				infoLayout.childControlWidth = false;
-				infoLayout.childControlHeight = false;
-				infoLayout.spacing = 20f;
-
-				var warningTexture = Plugin.Resources.LoadAsset<Texture2D>("warning.png");
-				var warningSprite = Sprite.Create(warningTexture, new Rect(0, 0, warningTexture.width, warningTexture.height), new Vector2(0.5f, 0.5f));
-
-				var image1Object = new GameObject("Image1");
-				var image1Image = image1Object.AddComponent<UnityEngine.UI.Image>();
-				image1Image.sprite = warningSprite;
-				var image1Rect = image1Object.GetComponent<RectTransform>();
-				image1Rect.sizeDelta = new Vector2(65f, 65f);
-				image1Rect.SetParent(infoContainer.transform);
-				var phase1 = image1Rect.gameObject.AddComponent<PhasingGraphicColor>();
-				phase1.phaseOffset = 1;
-
-				var warningText = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
-				warningText.GetComponentInChildren<LanguageTextMeshController>().token = "XSS_WARN";
-				var warnLayout = warningText.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
-				warnLayout.GetComponent<RectTransform>().sizeDelta = new Vector2(500, 200);
-				warningText.transform.SetParent(infoContainer.transform);
-				warningText.transform.localScale = Vector3.one;
-				warningText.gameObject.SetActive(true);
-
-				var image2Object = new GameObject("Image2");
-				var image2Image = image2Object.AddComponent<UnityEngine.UI.Image>();
-				image2Image.sprite = warningSprite;
-				var image2Rect = image2Object.GetComponent<RectTransform>();
-				image2Rect.sizeDelta = new Vector2(65f, 65f);
-				image2Rect.SetParent(infoContainer.transform);
-				image2Rect.gameObject.AddComponent<PhasingGraphicColor>();
-
-				notificationPanel.transform.SetAsLastSibling();
-				notificationPanel.gameObject.SetActive(true);*/
-
 				LocalUserPanel.AllowChanges = false;
 			}
 			else
@@ -627,6 +586,26 @@ namespace Dodad.XSplitscreen.Components
 			// Credits
 
 			transform.Find("Credits Panel").gameObject.AddComponent<CreditsController>();
+		}
+
+		private static void LogHierarchy(Transform root)
+		{
+			if (root == null)
+			{
+				Log.Print("LogHierarchy: root is null");
+				return;
+			}
+
+			void Recurse(Transform t, string path, int depth)
+			{
+				string indent = new string(' ', depth * 2);
+				Log.Print($"{indent}{(string.IsNullOrEmpty(path) ? "" : path)}{t.name} (activeSelf: {t.gameObject.activeSelf}, activeInHierarchy: {t.gameObject.activeInHierarchy})");
+
+				for (int i = 0; i < t.childCount; i++)
+					Recurse(t.GetChild(i), string.IsNullOrEmpty(path) ? t.name + "/" : path + t.name + "/", depth + 1);
+			}
+
+			Recurse(root, "", 0);
 		}
 
 		public void OnClaimUpdated(bool state)

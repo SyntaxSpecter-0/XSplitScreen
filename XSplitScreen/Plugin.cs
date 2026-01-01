@@ -16,7 +16,7 @@ using UnityEngine.EventSystems;
 
 namespace Dodad.XSplitscreen
 {
-    [BepInPlugin(PluginGUID, PluginName, "4.0.8")]
+    [BepInPlugin(PluginGUID, PluginName, "4.0.9")]
     [NetworkCompatibility(CompatibilityLevel.NoNeedForSync, VersionStrictness.DifferentModVersionsAreOk)]
 	[BepInDependency(LanguageAPI.PluginGUID, BepInDependency.DependencyFlags.HardDependency)]
 	public class Plugin : BaseUnityPlugin
@@ -37,7 +37,6 @@ namespace Dodad.XSplitscreen
 		internal static HarmonyLib.Harmony Patcher { get; private set; }
 
         private static HGButton MainMenuTitleButton;
-
 
 		private static Color[] _multiplayerColors;
 
