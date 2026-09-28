@@ -94,7 +94,8 @@ namespace Dodad.XSplitscreen.Components
 		private void SetupRedesignedUI()
 		{
 			var expandedContent = Slot.transform.Find("ExpandedContent");
-			var tabsContainer = expandedContent.Find("TabBar/TabsContainer");
+			var tabBar = expandedContent.Find("TabBar");
+			var tabsContainer = tabBar.Find("TabsContainer");
 
 			_tabNodes = new[]
 			{
@@ -109,6 +110,16 @@ namespace Dodad.XSplitscreen.Components
 				{ typeof(ColorConfigurator), expandedContent.Find("ColorContent") },
 				{ typeof(TrailsConfigurator), expandedContent.Find("TrailsContent") },
 			};
+
+			// (specter) LB/RB hint text is baked grey (#8a8d96) into the prefab and never
+			// re-colored at runtime elsewhere - override it here to match the white tab text.
+			foreach (var shoulder in new[] { "LBButton", "RBButton" })
+			{
+				var button = tabBar.Find(shoulder);
+				if (button == null) continue;
+				foreach (var tmp in button.GetComponentsInChildren<TextMeshProUGUI>(true))
+					tmp.color = Color.white;
+			}
 		}
 
 		/// <summary>
@@ -411,7 +422,6 @@ namespace Dodad.XSplitscreen.Components
 		// sampling runs.
 		private static Color TabTextColor => SplitscreenMenuController.RoR2TextColor;
 		private static Color TabMutedColor => SplitscreenMenuController.RoR2MutedColor;
-		private static Color TabAccentColor => SplitscreenMenuController.RoR2AccentColor;
 		private static readonly Color Transparent = new Color(0, 0, 0, 0);
 
 		/// <summary>
@@ -440,8 +450,8 @@ namespace Dodad.XSplitscreen.Components
 
 				label.text = ResolveToken(configurator.GetName());
 				label.color = !canOpen ? TabMutedColor : TabTextColor;
-				check.SetActive(configurator.IsConfirmed);
-				underline.color = TabAccentColor;
+				check.SetActive(false); // (specter) tab checkmark deemed unneeded, always hidden
+				underline.color = Color.white;
 			}
 
 			var active = list[_configuratorIndex];

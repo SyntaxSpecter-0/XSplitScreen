@@ -164,6 +164,7 @@ namespace Dodad.XSplitscreen.Components
 		private SlotOptions _options;
 		private TextMeshProUGUI _yLabel, _lbLabel, _rbLabel;
 		private TextMeshProUGUI[] _aButtonLabels;
+		private TextMeshProUGUI[] _upArrowLabels, _downArrowLabels;
 		private Outline _yOutline;
 		private Outline[] _aButtonOutlines;
 		private bool _themeApplied;
@@ -318,6 +319,7 @@ namespace Dodad.XSplitscreen.Components
 			_yToggleButton.allowAllEventSystems = true;
 			_yToggleButton.onClick.AddListener(() => _options.ToggleExpanded());
 			_yChevron = yToggle.Find("Chevron").GetComponent<RectTransform>();
+			_yChevron.gameObject.SetActive(false); // (specter) deemed unneeded - revert: remove this line
 			_yLabel = yToggle.Find("YCircle/Label").GetComponent<TextMeshProUGUI>();
 			_yOutline = yToggle.Find("YCircle").GetComponent<Outline>();
 
@@ -350,23 +352,37 @@ namespace Dodad.XSplitscreen.Components
 				_aButtonOutlines[i] = aButtonNode.GetComponent<Outline>();
 			}
 
+			// (specter) Only Profile/Trails use the MakeValuePanel shape (Up/Down arrow browsing) -
+			// ColorContent has its own left/right hue-bar shape instead.
+			var valuePanelNames = new[] { "ProfileContent", "TrailsContent" };
+			_upArrowLabels = new TextMeshProUGUI[valuePanelNames.Length];
+			_downArrowLabels = new TextMeshProUGUI[valuePanelNames.Length];
+			for (int i = 0; i < valuePanelNames.Length; i++)
+			{
+				var content = _expandedContent.Find(valuePanelNames[i]);
+				_upArrowLabels[i] = content.Find("UpArrow").GetComponent<TextMeshProUGUI>();
+				_downArrowLabels[i] = content.Find("DownArrow").GetComponent<TextMeshProUGUI>();
+			}
+
 			UpdateInputGlyphs();
 		}
 
 		/// <summary>
-		/// (specter) (asset, confirm sprite, north sprite, LB/L1 sprite, RB/R1 sprite) per gamepad
-		/// family, matching RoR2.Glyphs' own registration calls. Can't use
-		/// RoR2.Glyphs.GetGlyphString here - it resolves through Rewired's per-player action
-		/// bindings, which our slot players don't have, so it always falls back to blank/unbound.
-		/// This builds the same sprite tags directly instead.
+		/// (specter) (asset, confirm sprite, north sprite, LB/L1 sprite, RB/R1 sprite, D-pad up
+		/// sprite, D-pad down sprite) per gamepad family, matching RoR2.Glyphs' own registration
+		/// calls. Can't use RoR2.Glyphs.GetGlyphString here - it resolves through Rewired's
+		/// per-player action bindings, which our slot players don't have, so it always falls back
+		/// to blank/unbound. This builds the same sprite tags directly instead.
+		/// Xbox/PS4 confirmed by exporting the real atlas and checking visually. PS5 reuses the
+		/// PS4 sheet - visually identical face buttons/D-pad, no separate PS5 atlas needed.
 		/// </summary>
 		// (specter) internal, not private - SplitscreenMenuController reuses xbox/ps4 LB/RB tags
 		// verbatim for the static "swap monitors" legend.
-		internal static readonly Dictionary<string, (string asset, string confirm, string north, string lb, string rb)> GamepadGlyphs = new()
+		internal static readonly Dictionary<string, (string asset, string confirm, string north, string lb, string rb, string up, string down)> GamepadGlyphs = new()
 		{
-			["xbox"] = ("tmpsprXboxOneGlyphs", "texXBoxOneGlyphs_0", "texXBoxOneGlyphs_11", "texXBoxOneGlyphs_2", "texXBoxOneGlyphs_6"),
-			["ps4"] = ("tmpsprPS4GlyphsUnified", "texPS4GlyphsUnified_0", "texPS4GlyphsUnified_1", "texPS4GlyphsUnified_4", "texPS4GlyphsUnified_5"),
-			["ps5"] = ("tmpsprPS5GlyphsUnified", "texPS5GlyphsUnified_Cross", "texPS5GlyphsUnified_Triangle", "texPS5GlyphsUnified_L1", "texPS5GlyphsUnified_R1"),
+			["xbox"] = ("tmpsprXboxOneGlyphs", "texXBoxOneGlyphs_0", "texXBoxOneGlyphs_11", "texXBoxOneGlyphs_2", "texXBoxOneGlyphs_6", "texXBoxOneGlyphs_14", "texXBoxOneGlyphs_15"),
+			["ps4"] = ("tmpsprPS4GlyphsUnified", "texPS4GlyphsUnified_0", "texPS4GlyphsUnified_1", "texPS4GlyphsUnified_4", "texPS4GlyphsUnified_5", "texPS4GlyphsUnified_21", "texPS4GlyphsUnified_22"),
+			["ps5"] = ("tmpsprPS4GlyphsUnified", "texPS4GlyphsUnified_0", "texPS4GlyphsUnified_1", "texPS4GlyphsUnified_4", "texPS4GlyphsUnified_5", "texPS4GlyphsUnified_21", "texPS4GlyphsUnified_22"),
 		};
 
 		/// <summary>
@@ -390,6 +406,10 @@ namespace Dodad.XSplitscreen.Components
 					label.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.confirm}\">";
 				_lbLabel.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.lb}\">";
 				_rbLabel.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.rb}\">";
+				foreach (var label in _upArrowLabels)
+					label.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.up}\">";
+				foreach (var label in _downArrowLabels)
+					label.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.down}\">";
 			}
 			else
 			{
@@ -400,6 +420,10 @@ namespace Dodad.XSplitscreen.Components
 					label.text = "Enter";
 				_lbLabel.text = "Q";
 				_rbLabel.text = "E";
+				foreach (var label in _upArrowLabels)
+					label.text = "▲";
+				foreach (var label in _downArrowLabels)
+					label.text = "▼";
 			}
 
 			// (specter) Reuse RoR2's own button color for the badge outlines instead of a guessed hex value.
