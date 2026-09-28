@@ -9,21 +9,39 @@
 
 Splitscreen for Risk of Rain 2 with UI-based persistent preferences
 
+## Requirements
+
+- R2API (Core, ContentManagement, Items, Language, Prefab)
+
+## Installation
+
+Install with a mod manager such as [r2modman](https://thunderstore.io/package/ebkr/r2modman/) or [Thunderstore Mod Manager](https://www.overwolf.com/app/Thunderstore-Thunderstore_Mod_Manager) - dependencies above will be installed automatically. To install manually, place the mod and its dependencies in your `BepInEx/plugins` folder.
+
+See [CHANGELOG.md](CHANGELOG.md) for a full list of changes between versions.
+
 # Instructions
 
 1. Launch the game and click on 'Splitscreen' above 'Singleplayer' in the title menu
 
 2. Press start on a controller to add a player or click to add a PC player
 
+![Player assignment screen](docs/images/full-ui.png)
+
 3. Customize your profile, color, and trails using the tabs, then select a screen to ready up. Multi-monitor users on controllers can press LB or RB to change monitors
+
+![Player customization tabs](docs/images/player-tabs.gif)
 
 ## Features
 
-- Seamless UI assignments designed by SyntaxSpecter
-- Persistent configuration
-- Multiple monitor support
-- Custom colors and trails
-- On-screen controller button icons for prompts
+- **Flexible screen assignment** designed by Dodad - split the screen into custom regions and move your cursor onto one to claim it for your player
+
+![Splitting the screen into regions](docs/images/screen-splitting.png)
+
+- **Persistent configuration** - your profile, color, and trail choices are remembered between sessions
+- **Multiple monitor support** - send each player to their own display
+- **Custom colors and trails** - pick a unique color and trail for each player's profile, through a tabbed panel UI redesigned by SyntaxSpecter
+- **On-screen controller button icons** for prompts, matching the controller each player is using
+- **Full controller support** - the entire menu can be navigated with a controller, the only exception being changing the game mode (planned to be fixed)
 - Theoretically supports up to 16 players in singleplayer or multiplayer
 
 ## FAQ
