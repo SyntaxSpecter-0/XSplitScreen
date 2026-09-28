@@ -1,3 +1,10 @@
+# XSplitScreen
+
+[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
+[![GitHub last commit](https://img.shields.io/github/last-commit/SyntaxSpecter-0/XSplitScreen)](https://github.com/SyntaxSpecter-0/XSplitScreen/commits)
+[![GitHub issues](https://img.shields.io/github/issues/SyntaxSpecter-0/XSplitScreen)](https://github.com/SyntaxSpecter-0/XSplitScreen/issues)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/maHhJSv62G)
+
 # Description
 
 Splitscreen for Risk of Rain 2 with UI-based persistent preferences
@@ -8,7 +15,7 @@ Splitscreen for Risk of Rain 2 with UI-based persistent preferences
 
 2. Press start on a controller to add a player or click to add a PC player
 
-3. Customize and then select a screen to ready up. Multi-monitor users on controllers can press LB or RB to change monitors
+3. Customize your profile, color, and trails using the tabs, then select a screen to ready up. Multi-monitor users on controllers can press LB or RB to change monitors
 
 ## Features
 
@@ -16,6 +23,7 @@ Splitscreen for Risk of Rain 2 with UI-based persistent preferences
 - Persistent configuration
 - Multiple monitor support
 - Custom colors and trails
+- On-screen controller button icons for prompts
 - Theoretically supports up to 16 players in singleplayer or multiplayer
 
 ## FAQ
