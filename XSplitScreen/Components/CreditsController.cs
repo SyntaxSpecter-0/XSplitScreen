@@ -43,10 +43,7 @@ namespace Dodad.XSplitscreen.Components
 
 		private void Update()
 		{
-			if (SplitscreenMenuController.MainInput == null)
-				return;
-
-			if (SplitscreenMenuController.MainInput.MouseLeft || SplitscreenMenuController.MainInput.East || SplitscreenMenuController.MainInput.South)
+			if (ShowCredits && AnyCloseInputPressed())
 				ShowCredits = false;
 
 			if (ShowCredits)
@@ -74,6 +71,26 @@ namespace Dodad.XSplitscreen.Components
 		private void InitializeReferences()
 		{
 			_group = GetComponent<CanvasGroup>();
+		}
+
+		// (specter) Check every slot's input, not just SplitscreenMenuController.MainInput -
+		// otherwise a non-host controller could open credits but never close them.
+		private static bool AnyCloseInputPressed()
+		{
+			if (SplitscreenMenuController.MainInput != null &&
+				(SplitscreenMenuController.MainInput.MouseLeft || SplitscreenMenuController.MainInput.East || SplitscreenMenuController.MainInput.South))
+				return true;
+
+			if (LocalUserSlot.Instances != null)
+			{
+				foreach (var slot in LocalUserSlot.Instances)
+				{
+					if (slot != null && slot.Input != null && (slot.Input.East || slot.Input.South))
+						return true;
+				}
+			}
+
+			return false;
 		}
 
 		private void InitializeRollerPrefab()
@@ -179,8 +196,9 @@ namespace Dodad.XSplitscreen.Components
 		private void InitializeContributors()
 		{
 			AddContributor("Creator", "dodad");
-			AddContributor("Art", "Claymaver (https://linktr.ee/claymaver)");
+			AddContributor("Art", "SyntaxSpecter");
 			AddContributor("Art", "dodad");
+			AddContributor("Programming", "SyntaxSpecter");
 			AddContributor("Programming", "Narl");
 			AddContributor("Programming", "AncientHeroX");
 			AddContributor("Programming", "pokedex4848");

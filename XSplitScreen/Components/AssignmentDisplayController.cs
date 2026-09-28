@@ -81,15 +81,17 @@ namespace Dodad.XSplitscreen.Components
 		private void AddAssignment(int id, Face face)
 		{
 			var assignmentGO = Instantiate(AssignmentPrefab, _assignmentArea);
-			var assignment = assignmentGO.AddComponent<AssignmentDisplay>();
-			var rectTransform = assignment.GetComponent<RectTransform>();
 
-			// Setup UIJuice for the assignment display
+			// (specter) UIJuice/CanvasGroup must exist before AssignmentDisplay is added - its
+			// Awake() caches GetComponent<UIJuice>(), and adding it after left that reference null.
 			var juice = assignmentGO.AddComponent<UIJuice>();
 			var canvasGroup = assignmentGO.AddComponent<CanvasGroup>();
 			juice.canvasGroup = canvasGroup;
 			juice.transitionDuration = 0.5f;
 			juice.originalAlpha = 1f;
+
+			var assignment = assignmentGO.AddComponent<AssignmentDisplay>();
+			var rectTransform = assignment.GetComponent<RectTransform>();
 
 			assignment.Initialize(id, face, this);
 

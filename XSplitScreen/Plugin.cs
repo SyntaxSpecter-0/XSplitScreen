@@ -16,7 +16,7 @@ using UnityEngine.EventSystems;
 
 namespace Dodad.XSplitscreen
 {
-    [BepInPlugin(PluginGUID, PluginName, "4.0.9")]
+    [BepInPlugin(PluginGUID, PluginName, "4.1.2")]
     [NetworkCompatibility(CompatibilityLevel.NoNeedForSync, VersionStrictness.DifferentModVersionsAreOk)]
 	[BepInDependency(LanguageAPI.PluginGUID, BepInDependency.DependencyFlags.HardDependency)]
 	public class Plugin : BaseUnityPlugin
@@ -218,14 +218,14 @@ namespace Dodad.XSplitscreen
 			string ptBrKey = "pt-br";
 			tokens.Add(ptBrKey, new StringDictionary
 			{
-				{ "XSS_NAME_HOVER", "Modificar as configurações da tela-dividida." },
-				{ "XSS_OPTION_DISCORD_HOVER", "Entre para suporte, dar feedback ou ver atualizações" },
+				{ "XSS_NAME_HOVER", "Modificar as configuraï¿½ï¿½es da tela-dividida." },
+				{ "XSS_OPTION_DISCORD_HOVER", "Entre para suporte, dar feedback ou ver atualizaï¿½ï¿½es" },
 				{ "XSS_PRESS_START_KBM", "- clique ou pressione start -" },
 				{ "XSS_PRESS_START", "- pressione start -" },
 				{ "XSS_CONFIG_PROFILE", "Guest" },
 				{ "XSS_CONFIG_COLOR", "Cor" },
 				{ "XSS_OPTION_MMM", "Modo Multi-Monitor" },
-				{ "XSS_OPTION_MMM_HOVER", "Ativar o Modo Multi-Monitor (não pode ser desativado)" },
+				{ "XSS_OPTION_MMM_HOVER", "Ativar o Modo Multi-Monitor (nï¿½o pode ser desativado)" },
 				{ "XSS_TRAILS", "Trails" },
 				{ "XSS_SELECT_SCREEN", "Select Screen" },
 				{ "XSS_READY", "Ready" },
@@ -240,14 +240,14 @@ namespace Dodad.XSplitscreen
 			string frKey = "fr";
 			tokens.Add(frKey, new StringDictionary
 			{
-				{ "XSS_NAME_HOVER", "Modifier les paramètres de splitscreen." },
-				{ "XSS_OPTION_DISCORD_HOVER", "Rejoignez nous pour du support, du feedback ou des mises à jour" },
+				{ "XSS_NAME_HOVER", "Modifier les paramï¿½tres de splitscreen." },
+				{ "XSS_OPTION_DISCORD_HOVER", "Rejoignez nous pour du support, du feedback ou des mises ï¿½ jour" },
 				{ "XSS_PRESS_START_KBM", "- cliquez ou appuyez sur start -" },
 				{ "XSS_PRESS_START", "- appuyez sur start -" },
 				{ "XSS_CONFIG_PROFILE", "Guest" },
 				{ "XSS_CONFIG_COLOR", "Couleur" },
-				{ "XSS_OPTION_MMM", "Mode Multi-Écrans" },
-				{ "XSS_OPTION_MMM_HOVER", "Activer le Mode Multi-Écrans (ne peut pas être désactivé)" },
+				{ "XSS_OPTION_MMM", "Mode Multi-ï¿½crans" },
+				{ "XSS_OPTION_MMM_HOVER", "Activer le Mode Multi-ï¿½crans (ne peut pas ï¿½tre dï¿½sactivï¿½)" },
 				{ "XSS_TRAILS", "Trails" },
 				{ "XSS_SELECT_SCREEN", "Select Screen" },
 				{ "XSS_READY", "Ready" },
@@ -456,6 +456,14 @@ namespace Dodad.XSplitscreen
 
 			Patcher.Patch(lunOriginal, prefix: new HarmonyLib.HarmonyMethod(lunPatch));
 
+			// (specter) Fixes per-player pod labels - vanilla's ProfileNameLabel.LateUpdate reads
+			// PlatformSystems.userManager.GetUserName() (a single machine-wide name), so every
+			// splitscreen player's pod shows the same Steam name.
+			var pnlOriginal = typeof(RoR2.UI.ProfileNameLabel).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic);
+			var pnlPatch = typeof(Plugin).GetMethod("ProfileNameLabel_LateUpdate", BindingFlags.Static | BindingFlags.NonPublic);
+
+			Patcher.Patch(pnlOriginal, postfix: new HarmonyLib.HarmonyMethod(pnlPatch));
+
 			// Combat health bar fix
 
 			var chbOriginal = typeof(RoR2.UI.CombatHealthBarViewer).GetMethod("SetLayoutHorizontal", BindingFlags.Instance | BindingFlags.Public);
@@ -474,6 +482,13 @@ namespace Dodad.XSplitscreen
 			var mcPatch = typeof(Plugin).GetMethod("ColorCatalog_GetMultiplayerColor", BindingFlags.Static | BindingFlags.NonPublic);
 
 			Patcher.Patch(mcOriginal, prefix: new HarmonyLib.HarmonyMethod(mcPatch));
+
+			// (specter) Guard against a vanilla crash in local-multiplayer camera/canvas setup -
+			// see the finalizer method's own comment for the full explanation.
+			var rcmOriginal = typeof(RoR2.RunCameraManager).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic);
+			var rcmFinalizer = typeof(Plugin).GetMethod("RunCameraManager_Update_Finalizer", BindingFlags.Static | BindingFlags.NonPublic);
+
+			Patcher.Patch(rcmOriginal, finalizer: new HarmonyLib.HarmonyMethod(rcmFinalizer));
 		}
 
 		//-----------------------------------------------------------------------------------------------------------
@@ -544,6 +559,10 @@ namespace Dodad.XSplitscreen
 
                 var menuController = menu.transform.Find("Splitscreen Menu");
 
+				// (specter) Scoped to Main Panel, not the whole canvas - Notification/Credits Panel
+				// rely on seeing through to whatever's behind the canvas at their edges.
+				SetupAmbientBackground(menuController.Find("Main Panel"));
+
 				var canvas = menuController.gameObject.GetComponent<Canvas>();
                 canvas.targetDisplay = id;
 
@@ -571,7 +590,30 @@ namespace Dodad.XSplitscreen
                 return null;
 			}
 		}
-		
+
+		/// <summary>
+		/// (specter) Adds an opaque #060606 backdrop plus drifting dots behind everything else in Main Panel.
+		/// </summary>
+		private static void SetupAmbientBackground(Transform mainPanel)
+		{
+			if (mainPanel == null) return;
+
+			var bg = new GameObject("BG", typeof(RectTransform), typeof(CanvasRenderer), typeof(UnityEngine.UI.Image));
+			var bgRect = (RectTransform) bg.transform;
+			bgRect.SetParent(mainPanel, false);
+			bgRect.SetAsFirstSibling();
+			bgRect.anchorMin = Vector2.zero;
+			bgRect.anchorMax = Vector2.one;
+			bgRect.sizeDelta = Vector2.zero;
+			bgRect.anchoredPosition = Vector2.zero;
+
+			var bgImage = bg.GetComponent<UnityEngine.UI.Image>();
+			bgImage.color = new Color(6f / 255f, 6f / 255f, 6f / 255f, 1f);
+			bgImage.raycastTarget = false;
+
+			bg.AddComponent<AmbientBackground>();
+		}
+
 		#endregion
 
 		//-----------------------------------------------------------------------------------------------------------
@@ -592,11 +634,14 @@ namespace Dodad.XSplitscreen
         /// </summary>
 		private static void OnMainMenuInitialized()
         {
+			// (specter) Also fires after quitting an active run, not just backing out of the menu
+			// screen - without this a controller stays reassigned to a non-"PlayerMain" Rewired
+			// player and can't navigate the main menu.
+			if (SplitscreenUserManager.IsSplitscreenEnabled)
+				SplitscreenUserManager.DisableSplitscreen();
+
             if (MainMenuTitleButton != null)
                 return;
-
-			//if (SplitscreenUserManager.IsSplitscreenEnabled())
-			//	SplitscreenUserManager.DisableSplitscreen();
 
 			UIHelper.Initialize();
 
@@ -657,6 +702,15 @@ namespace Dodad.XSplitscreen
 
         private static bool ColorCatalog_GetMultiplayerColor(int playerSlot, ref Color __result)
 		{
+			// (specter) multiplayerColors is only populated once splitscreen has been enabled at
+			// least once this session (see HookManager.UpdateMultiplayerColors). Fall back to
+			// vanilla behavior instead of throwing when a nameplate/health bar resolves a color
+			// before then.
+			if (multiplayerColors == null)
+			{
+				return true;
+			}
+
 			if (playerSlot >= 0 && playerSlot < multiplayerColors.Length)
 			{
 				 __result = multiplayerColors[playerSlot];
@@ -667,6 +721,24 @@ namespace Dodad.XSplitscreen
 			}
 
 			return false;
+		}
+
+		/// <summary>
+		/// (specter) Vanilla's RunCameraManager.Update indexes its camera dictionary by player
+		/// name with no existence check, assuming every local player already has a camera - not
+		/// true until entitlements resolve, and that check gets re-triggered (and the race
+		/// reopened) more than once per session. Rather than chase every trigger, swallow the
+		/// resulting KeyNotFoundException here and let it retry next frame; anything else rethrows.
+		/// </summary>
+		private static Exception RunCameraManager_Update_Finalizer(Exception __exception)
+		{
+			if (__exception is System.Collections.Generic.KeyNotFoundException)
+			{
+				Log.Print("RunCameraManager.Update threw KeyNotFoundException (vanilla local-multiplayer camera/entitlement race) - suppressed, retrying next frame.", Log.ELogChannel.Warning);
+				return null;
+			}
+
+			return __exception;
 		}
 
 		private static bool CombatHealthBarViewer_SetLayoutHorizontal(RoR2.UI.CombatHealthBarViewer __instance)
@@ -681,16 +753,56 @@ namespace Dodad.XSplitscreen
 			return false;
 		}
 
-		private static void NetworkUser_UpdateUserName(RoR2.NetworkUser __instance)
+		private static bool NetworkUser_UpdateUserName(RoR2.NetworkUser __instance)
 		{
-			if (__instance.localUser == null)
+			// (specter) Always skip the vanilla body (see TryResolveUserName) - a one-shot
+			// "!isLocalPlayer -> let vanilla run" check was the bug: isLocalPlayer isn't true yet
+			// on the first UpdateUserName call, so every local player permanently baked in
+			// vanilla's single-Steam-account name.
+			TryResolveUserName(__instance, retriesLeft: 30);
+
+			return false;
+		}
+
+		private static void TryResolveUserName(RoR2.NetworkUser instance, int retriesLeft)
+		{
+			if (instance == null)
+				return;
+
+			if (instance.isLocalPlayer && instance.localUser != null)
 			{
-				ExecuteNextFrame.Invoke(() => NetworkUser_UpdateUserName(__instance));
+				// (specter) Skip vanilla's resolution (the machine's single Steam account) so the
+				// per-profile name isn't overwritten.
+				instance.userName = instance.localUser.userProfile.name;
+				return;
 			}
-			else
+
+			if (retriesLeft > 0)
 			{
-				__instance.userName = __instance.localUser.userProfile.name;
+				// (specter) Retry for a short grace period rather than bailing immediately - covers
+				// isLocalPlayer/localUser still linking, then falls through to remote players.
+				ExecuteNextFrame.Invoke(() => TryResolveUserName(instance, retriesLeft - 1));
+				return;
 			}
+
+			// (specter) Grace period exhausted with no local link - genuinely remote, resolve like vanilla.
+			instance.userName = instance.GetNetworkPlayerName().GetResolvedName();
+		}
+
+		private static readonly FieldInfo ProfileNameLabelTokenField = typeof(RoR2.UI.ProfileNameLabel).GetField("token", BindingFlags.Instance | BindingFlags.NonPublic);
+
+		private static void ProfileNameLabel_LateUpdate(RoR2.UI.ProfileNameLabel __instance)
+		{
+			var locator = __instance.GetComponent<MPEventSystemLocator>();
+			var localUser = locator?.eventSystem?.localUser;
+
+			if (localUser?.userProfile == null)
+				return;
+
+			var label = __instance.GetComponent<TMPro.TextMeshProUGUI>();
+			var token = (string)ProfileNameLabelTokenField.GetValue(__instance);
+
+			label.text = RoR2.Language.GetStringFormatted(token, localUser.userProfile.name);
 		}
 
 		private static void CharacterSelectController_Awake(RoR2.UI.CharacterSelectController __instance)
