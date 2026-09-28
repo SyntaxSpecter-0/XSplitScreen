@@ -35,7 +35,7 @@ See [CHANGELOG.md](CHANGELOG.md) for a full list of changes between versions.
 
 - **Flexible screen assignment** designed by Dodad - split the screen into custom regions and move your cursor onto one to claim it for your player
 
-![Splitting the screen into regions](docs/images/screen-splitting.png)
+![Splitting the screen into regions](docs/images/screen-splitting.gif)
 
 - **Persistent configuration** - your profile, color, and trail choices are remembered between sessions
 - **Multiple monitor support** - send each player to their own display
