@@ -19,7 +19,7 @@ Splitscreen for Risk of Rain 2 with UI-based persistent preferences
 
 ## Features
 
-- Seamless UI assignments with icon designs by Claymaver
+- Seamless UI assignments designed by SyntaxSpecter
 - Persistent configuration
 - Multiple monitor support
 - Custom colors and trails
