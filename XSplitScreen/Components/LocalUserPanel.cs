@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace Dodad.XSplitscreen.Components
 {
@@ -26,10 +27,19 @@ namespace Dodad.XSplitscreen.Components
 		public SplitscreenMenuController Controller => _controller;
 		internal LocalUserSlot[] UserSlots => userContainer.GetComponentsInChildren<LocalUserSlot>();
 
-		internal int FilledSlots => userContainer.childCount;
+		// (specter) Content's own direct children are now just the 2 column containers, not
+		// slots (see Initialize()) - count actual LocalUserSlot components instead.
+		internal int FilledSlots => UserSlots.Length;
 
 		private GameObject userPrefab;
 		private Transform userContainer;
+
+		/// <summary>
+		/// (specter) The 2 side-by-side columns slots are actually parented into - see the setup
+		/// in Initialize(). userContainer (Content) itself only holds these two.
+		/// </summary>
+		private Transform _columnLeft;
+		private Transform _columnRight;
 
 		internal int MonitorId { get; private set; }
 
@@ -38,8 +48,33 @@ namespace Dodad.XSplitscreen.Components
 		//-----------------------------------------------------------------------------------------------------------
 
 		/// <summary>
-		/// Handle adding and removing users to slots when pressing start or back
+		/// (specter) Drives the 2-column layout by hand every frame: each column's width/X
+		/// position, and Content's height (the taller column). HorizontalLayoutGroup's cross-axis
+		/// positioning wouldn't hold a column at a fixed offset no matter how childControlHeight
+		/// was set (confirmed via testing), so columns are plain top-left-anchored points (see
+		/// CreateColumn) with no LayoutGroup involved at all - just field assignments here.
 		/// </summary>
+		public void LateUpdate()
+		{
+			if (userContainer == null || _columnLeft == null || _columnRight == null) return;
+
+			const float halfGap = 4f; // (specter) half of an 8px gap between the columns
+
+			var contentRect = (RectTransform) userContainer;
+			var leftRect = (RectTransform) _columnLeft;
+			var rightRect = (RectTransform) _columnRight;
+
+			float columnWidth = Mathf.Max(0f, contentRect.rect.width / 2f - halfGap);
+
+			leftRect.anchoredPosition = new Vector2(0f, 0f);
+			leftRect.sizeDelta = new Vector2(columnWidth, leftRect.sizeDelta.y);
+
+			rightRect.anchoredPosition = new Vector2(columnWidth + halfGap * 2f, 0f);
+			rightRect.sizeDelta = new Vector2(columnWidth, rightRect.sizeDelta.y);
+
+			contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, Mathf.Max(leftRect.rect.height, rightRect.rect.height));
+		}
+
 		public void Update()
 		{
 			if (!AllowChanges || MonitorId != 0)
@@ -117,6 +152,7 @@ namespace Dodad.XSplitscreen.Components
 			foreach (var controller in controllers)
 				main.controllers.AddController(controller, true);
 
+			slot.ReleaseProfile();
 			slot.LocalPlayer = null;
 			currentPlayer.SetVibration(0, 0, true);
 		}
@@ -141,7 +177,8 @@ namespace Dodad.XSplitscreen.Components
 			if (freeSlot == null)
 				return false;
 
-			slot.transform.SetParent(userContainer);
+			// (specter) into one of the 2 columns, not Content directly - see Initialize().
+			slot.transform.SetParent(GetTargetColumn());
 			//slot.transform.localScale = Vector3.one;
 
 			if (transform.childCount == MAX_USERS)
@@ -186,7 +223,32 @@ namespace Dodad.XSplitscreen.Components
 					juice.TransitionPanFromLeft();
 				});
 
-				userContainer = transform.Find("Slots");
+				// (specter) The visible list scrolls (see menu.prefab's Slots/Viewport/Content) -
+				// slots are parented into Content, not the ScrollRect root itself.
+				userContainer = transform.Find("Slots/Viewport/Content");
+
+				// (specter) Content ships with a single-column VerticalLayoutGroup + ContentSizeFitter.
+				// A HorizontalLayoutGroup couldn't hold the 2 columns at a fixed cross-axis offset no
+				// matter the childControlHeight setting (confirmed via testing), so both are removed:
+				// columns anchor directly to Content's corners instead (see CreateColumn), and
+				// LateUpdate sizes Content to the taller column by hand.
+				// DestroyImmediate, not Destroy: a GameObject can only carry one LayoutGroup, and
+				// Destroy() doesn't remove it until end of frame - code right after this would still
+				// see the old component present.
+				var oldLayout = userContainer.GetComponent<VerticalLayoutGroup>();
+				if (oldLayout != null)
+					UnityEngine.Object.DestroyImmediate(oldLayout);
+				var oldFitter = userContainer.GetComponent<ContentSizeFitter>();
+				if (oldFitter != null)
+					UnityEngine.Object.DestroyImmediate(oldFitter);
+
+				_columnLeft = userContainer.Find("ColumnLeft");
+				_columnRight = userContainer.Find("ColumnRight");
+				if (_columnLeft == null || _columnRight == null)
+				{
+					_columnLeft = CreateColumn(userContainer, "ColumnLeft");
+					_columnRight = CreateColumn(userContainer, "ColumnRight");
+				}
 
 				userPrefab ??= Plugin.Resources.LoadAsset<GameObject>("UserSlot.prefab");
 
@@ -214,11 +276,47 @@ namespace Dodad.XSplitscreen.Components
 		{
 			//Log.Print($"[{this.GetType().Name}.{MethodBase.GetCurrentMethod().Name}]");
 
-			var newSlot = GameObject.Instantiate(userPrefab, userContainer);
+			var newSlot = GameObject.Instantiate(userPrefab, GetTargetColumn());
 
 			newSlot.gameObject.AddComponent<LocalUserSlot>();
 
 			newSlot.gameObject.SetActive(true);
+		}
+
+		/// <summary>
+		/// (specter) Whichever of the 2 columns currently has fewer slots in it.
+		/// </summary>
+		private Transform GetTargetColumn() => _columnLeft.childCount <= _columnRight.childCount ? _columnLeft : _columnRight;
+
+		/// <summary>
+		/// (specter) Builds one of the 2 side-by-side columns. Anchored as a plain top-left point
+		/// (not stretched, no parent LayoutGroup) - LateUpdate drives its position/size by hand.
+		/// Internally still a plain VerticalLayoutGroup + ContentSizeFitter, same as Content's old
+		/// single-column setup.
+		/// </summary>
+		private static Transform CreateColumn(Transform parent, string name)
+		{
+			var go = new GameObject(name, typeof(RectTransform));
+			go.transform.SetParent(parent, false);
+
+			var rt = (RectTransform) go.transform;
+			rt.anchorMin = new Vector2(0f, 1f);
+			rt.anchorMax = new Vector2(0f, 1f);
+			rt.pivot = new Vector2(0f, 1f);
+
+			var vertical = go.AddComponent<VerticalLayoutGroup>();
+			vertical.padding = new RectOffset(0, 0, 0, 0);
+			vertical.spacing = 2;
+			vertical.childAlignment = TextAnchor.UpperCenter;
+			vertical.childForceExpandWidth = true;
+			vertical.childForceExpandHeight = false;
+			vertical.childControlWidth = true;
+			vertical.childControlHeight = true;
+
+			var fitter = go.AddComponent<ContentSizeFitter>();
+			fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+			return go.transform;
 		}
 
 		//-----------------------------------------------------------------------------------------------------------
@@ -227,7 +325,9 @@ namespace Dodad.XSplitscreen.Components
 		{
 			foreach (var instance in LocalUserSlot.Instances)
 			{
-				if (instance.transform.parent != userContainer)
+				// (specter) slots live inside one of the 2 columns now, not directly under
+				// userContainer (Content) - see Initialize().
+				if (instance.transform.parent != _columnLeft && instance.transform.parent != _columnRight)
 					continue;
 
 				if (instance.LocalPlayer == null)
@@ -300,8 +400,12 @@ namespace Dodad.XSplitscreen.Components
 				LocalUserSlot.DeviceIcons = new Dictionary<string, Sprite>();
 
 				foreach (var icon in availableIcons)
-					LocalUserSlot.DeviceIcons.Add(icon.Split("/")
-						.Reverse().First().Replace("device_", "").Replace(".png", ""), Plugin.Resources.LoadAsset<Sprite>(icon));
+				{
+					string fileName = icon.Substring(icon.LastIndexOf('/') + 1);
+					string key = fileName.Replace("device_", "").Replace(".png", "");
+
+					LocalUserSlot.DeviceIcons.Add(key, Plugin.Resources.LoadAsset<Sprite>(icon));
+				}
 			}
 		}
 
@@ -327,6 +431,17 @@ namespace Dodad.XSplitscreen.Components
 		/// <param name="args"></param>
 		public void OnControllerAddedEvent(ControllerStatusChangedEventArgs args)
 		{
+			// (specter) Route a reconnecting controller back to its previous slot first - otherwise
+			// two slots with zero controllers would race for whichever reconnects first.
+			var previousSlot = LocalUserSlot.GetLastSlotForController(args.controllerId);
+
+			if (previousSlot?.LocalPlayer != null && previousSlot.LocalPlayer.controllers.Controllers.Count() == 0)
+			{
+				previousSlot.LocalPlayer.controllers.AddController(args.controller, false);
+
+				return;
+			}
+
 			foreach(var slot in LocalUserSlot.Instances)
 			{
 				if (slot.LocalPlayer != null &&

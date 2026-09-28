@@ -255,7 +255,7 @@ namespace Dodad.XSplitscreen
 				if (user.ParticleSystem != null)
 					return;
 
-				if (__instance.networkUser.localUser.userProfile.fileName == null)
+				if (__instance.networkUser.localUser.userProfile == null || __instance.networkUser.localUser.userProfile.fileName == null)
 					return;
 
 				var trailKey = SplitScreenSettings.GetOrCreateUserModule<TrailsSettingsModule>(__instance.networkUser.localUser.userProfile.fileName).TrailKey;
@@ -389,8 +389,15 @@ namespace Dodad.XSplitscreen
 
 			foreach (var user in localUsers)
 			{
-				if (user.InputPlayer.controllers.joystickCount == 0)
+				// (specter) Exclude keyboard/mouse users (joystickCount==0 for them too) and stop
+				// after the first match, or a reconnecting gamepad lands on whichever eligible user
+				// is last in the list instead of the one that actually needs it.
+				if (user.InputPlayer.controllers.joystickCount == 0 && !user.InputPlayer.controllers.hasKeyboard)
+				{
 					user.InputPlayer.controllers.AddController(args.controller, true);
+
+					return;
+				}
 			}
 		}
 
@@ -398,43 +405,20 @@ namespace Dodad.XSplitscreen
 		{
 			var field = typeof(RunCameraManager).GetField("ScreenLayouts", BindingFlags.Static | BindingFlags.Public);
 
-			Rect[][] rects = new Rect[5][]
-			{
-				new Rect[0],
-				new Rect[1]
-				{
-					new Rect(0f, 0f, 1f, 1f)
-				},
-				new Rect[2]
-				{
-					new Rect(0f, 0.5f, 1f, 0.5f),
-					new Rect(0f, 0f, 1f, 0.5f)
-				},
-				new Rect[3]
-				{
-					new Rect(0f, 0.5f, 1f, 0.5f),
-					new Rect(0f, 0f, 0.5f, 0.5f),
-					new Rect(0.5f, 0f, 0.5f, 0.5f)
-				},
-				new Rect[4]
-				{
-					new Rect(0f, 0.5f, 0.5f, 0.5f),
-					new Rect(0.5f, 0.5f, 0.5f, 0.5f),
-					new Rect(0f, 0f, 0.5f, 0.5f),
-					new Rect(0.5f, 0f, 0.5f, 0.5f)
-				}
-			};
+			Rect[][] rects = new Rect[5][];
+			for (int count = 0; count < rects.Length; count++)
+				rects[count] = LayoutFor(count);
 
 			if (isSplitscreenEnabled)
 			{
 				var localUsers = SplitscreenUserManager.LocalUsers;
 
+				// (specter) Every index up to localUsers.Count needs a valid entry, or vanilla's
+				// per-frame camera update null-refs on the gap during a transient mismatch.
 				rects = new UnityEngine.Rect[localUsers.Count + 1][];
-				rects[0] = new UnityEngine.Rect[0];
-				rects[1] = new Rect[1]
-				{
-				new Rect(0f, 0f, 1f, 1f)
-				};
+
+				for (int count = 0; count < localUsers.Count; count++)
+					rects[count] = LayoutFor(count);
 
 				var uRects = new UnityEngine.Rect[localUsers.Count];
 
@@ -459,6 +443,64 @@ namespace Dodad.XSplitscreen
 					Log.Print($"Rect[{e}][{r}] -> {rects[e][r]}");
 				}
 			}
+		}
+
+		/// <summary>
+		/// (specter) Generates a default horizontal-bands split for `count` players - only used
+		/// as the transient-count safety net above; players define their own split via the
+		/// assignment-screen's region grid.
+		/// </summary>
+		internal static Rect[] LayoutFor(int count)
+		{
+			if (count <= 0)
+				return new Rect[0];
+
+			if (count == 1)
+				return new[] { new Rect(0f, 0f, 1f, 1f) };
+
+			if (count == 2)
+				return new[] { new Rect(0f, 0.5f, 1f, 0.5f), new Rect(0f, 0f, 1f, 0.5f) };
+
+			if (count == 3)
+			{
+				return new[]
+				{
+					new Rect(0f, 0.5f, 1f, 0.5f),
+					new Rect(0f, 0f, 0.5f, 0.5f),
+					new Rect(0.5f, 0f, 0.5f, 0.5f)
+				};
+			}
+
+			if (count == 4)
+			{
+				return new[]
+				{
+					new Rect(0f, 0.5f, 0.5f, 0.5f),
+					new Rect(0.5f, 0.5f, 0.5f, 0.5f),
+					new Rect(0f, 0f, 0.5f, 0.5f),
+					new Rect(0.5f, 0f, 0.5f, 0.5f)
+				};
+			}
+
+			// (specter) count > 4: generic grid.
+			int primary = Mathf.CeilToInt(Mathf.Sqrt(count));
+			int columns = Mathf.CeilToInt((float) count / primary);
+			int rows = Mathf.CeilToInt((float) count / columns);
+
+			var result = new Rect[count];
+			for (int i = 0; i < count; i++)
+			{
+				int row = i / columns;
+				bool isLastRow = row == rows - 1;
+				int itemsInRow = isLastRow ? count - columns * (rows - 1) : columns;
+				int col = i % columns;
+
+				float w = 1f / itemsInRow;
+				float h = 1f / rows;
+				result[i] = new Rect(col * w, 1f - (row + 1) * h, w, h);
+			}
+
+			return result;
 		}
 
 		private static MethodInfo PauseStopController_allowMultiplayerPause_Orig;

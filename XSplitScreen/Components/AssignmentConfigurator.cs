@@ -39,6 +39,11 @@ namespace Dodad.XSplitscreen.Components
 
 		private RectTransform _controllerRect;
 
+		// (specter) The panel this cursor is currently anchored to. Tracked so a slot move to a
+		// different monitor's panel (LocalUserSlot.MoveSlotByDirection, via LB/RB) can be detected
+		// and the cursor re-anchored - see RefreshAnchorIfPanelChanged.
+		private LocalUserPanel _anchoredPanel;
+
 		/// <summary>
 		/// Move a single cursor on the UI.
 		/// target: RectTransform of the cursor
@@ -194,7 +199,7 @@ namespace Dodad.XSplitscreen.Components
 		{
 			Cleanup();
 
-			OnFinished();
+			OnFinished?.Invoke();
 		}
 
 		public override void OnConfirm()
@@ -234,21 +239,56 @@ namespace Dodad.XSplitscreen.Components
 
 					originalScale = _cursor.localScale;
 					originalRotation = _cursor.localRotation;
-
-					_controllerRect = Options.Slot.Panel.Controller.GetComponent<RectTransform>();
 				}
 
-				_cursor.SetParent(Options.Slot.Panel.transform.parent.Find("Assignment Panel/DisplayContainer"));
+				RefreshAnchorIfPanelChanged();
 				SetCursorVisibility(true);
 			}
 
 			_isOpen = true;
 		}
 
+		/// <summary>
+		/// (specter) Re-anchors the cursor's bounds and parent to whichever panel this slot
+		/// currently belongs to - needed since a player can move slots to a different monitor via
+		/// LB/RB after Open() already ran once. Cheap comparison, safe to call every frame.
+		/// </summary>
+		private bool _anchorInitialized;
+
+		private void RefreshAnchorIfPanelChanged()
+		{
+			var currentPanel = Options.Slot.Panel;
+			if (currentPanel == null)
+				return; // (specter) not assigned yet - retry next call instead of anchoring to nothing
+
+			// (specter) _anchorInitialized guards the first call - comparing currentPanel to a null
+			// _anchoredPanel would read "null == null" as no change and skip anchoring entirely.
+			if (_anchorInitialized && currentPanel == _anchoredPanel)
+				return;
+
+			_anchorInitialized = true;
+			_anchoredPanel = currentPanel;
+			_controllerRect = currentPanel.Controller?.GetComponent<RectTransform>();
+
+			// (specter) Parented to Main Panel, not just Assignment Panel, so MoveCursor's clamp
+			// lets it reach the Credits/Discord/Back buttons too.
+			if (_cursor != null)
+			{
+				_cursor.SetParent(currentPanel.transform.parent);
+				_cursor.SetAsLastSibling();
+			}
+		}
+
 		public override void ConfiguratorUpdate()
 		{
 			if(_isOpen && _showCursor)
 			{
+				RefreshAnchorIfPanelChanged();
+
+				// (specter) Kept in sync every frame - the cursor opens before a color is usually picked.
+				if (_cursorImage != null)
+					_cursorImage.color = Options.Slot.MainColor;
+
 				MoveCursor(_cursor, new Vector2(Options.Slot.Input.LeftRightDelta, Options.Slot.Input.UpDownDelta), _maxSpeed, _maxAcceleration);
 				CheckCursorHovering();
 
@@ -257,20 +297,10 @@ namespace Dodad.XSplitscreen.Components
 					OnConfirm();
 				}
 
-				if (Options.Slot.Input.East)
-				{
-					if (_claim != null)
-					{
-						ResetClaim();
-					}
-					else
-					{
-						Cleanup();
-
-						OnFinished();
-					}
-
-				}
+				// (specter) East releases a claimed region only - the cursor is always-on now, so
+				// calling Cleanup() here would hide it permanently with no way back.
+				if (Options.Slot.Input.East && _claim != null)
+					ResetClaim();
 			}
 
 			if(SplitscreenMenuController.ReadyToLoad && IsReady)
@@ -307,7 +337,14 @@ namespace Dodad.XSplitscreen.Components
 
 		private void CheckCursorHovering()
 		{
+			var previousTarget = _hoverTarget;
 			_hoverTarget = Utilities.Hovercast.GetSelectableUnderCursor(_controllerRect, _cursor);
+
+			// (specter) Hovercast finds the Selectable but never fires a hover event, so a button's
+			// highlight never triggered even though clicking already worked. Driving this player's
+			// own MPEventSystem selection (per-player, not the global EventSystem) fixes that.
+			if (_hoverTarget != previousTarget)
+				Options.Slot.EventSystem?.SetSelectedObject(_hoverTarget != null ? _hoverTarget.gameObject : null);
 
 			// Animate cursor based on hover state
 			Animate(_cursor, _hoverTarget != null, 0.8f, 45f, _animationSpeed);
@@ -381,6 +418,12 @@ namespace Dodad.XSplitscreen.Components
 		{
 			if (_cursor != null)
 				Destroy(_cursor.gameObject);
+
+			// (specter) Also reset the anchor state, not just _cursor - otherwise a rebuilt cursor
+			// gets skipped by RefreshAnchorIfPanelChanged's "same panel, nothing to do" check and
+			// never gets parented into the UI at all.
+			_anchorInitialized = false;
+			_anchoredPanel = null;
 		}
 
 		public void ReceiveClaim(DisplayClaim claim)

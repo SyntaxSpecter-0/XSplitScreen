@@ -37,7 +37,8 @@ namespace Dodad.XSplitscreen.Components
 
 		public override void OnCancel()
 		{
-			OnFinished();
+			if (Options.Slot.IsKeyboardUser)
+				OnFinished();
 		}
 
 		public override void ForceClose()
@@ -47,12 +48,13 @@ namespace Dodad.XSplitscreen.Components
 
 		public override void OnConfirm()
 		{
-			OnFinished();
+			IsConfirmed = true;
 		}
 
 		public override void OnNavigate(int direction)
 		{
 			TrailIndex += direction;// = Mathf.Clamp(direction + _trailIndex, 0, NavigatorCount - 1);
+			IsConfirmed = false;
 
 			UpdateMessage();
 		}
@@ -60,12 +62,14 @@ namespace Dodad.XSplitscreen.Components
 		public override void OnNavigateIndex(int index)
 		{
 			TrailIndex = index;
+			IsConfirmed = false;
 			UpdateMessage();
 		}
 
 		public override void Open()
 		{
 			UpdateMessage();
+			IsConfirmed = true; // (specter) a trail (possibly "none") is always set already
 		}
 
 		public override void OnLoadProfile()
@@ -105,8 +109,10 @@ namespace Dodad.XSplitscreen.Components
 
 		public override void ConfiguratorUpdate()
 		{
-			if (Options.Slot.Input.South || Options.Slot.Input.East)
-				OnFinished();
+			if (Options.Slot.Input.South)
+				OnConfirm();
+			else if (Options.Slot.Input.East)
+				OnCancel();
 		}
 	}
 }

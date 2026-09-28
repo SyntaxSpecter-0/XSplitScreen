@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using MonoMod.Cil;
 
 namespace Dodad.XSplitscreen.Components
@@ -56,6 +57,40 @@ namespace Dodad.XSplitscreen.Components
 
 		private static float loadTimer;
 		private static bool AllowLoad;
+		private static GameObject countdownBanner;
+		private static TMPro.TextMeshProUGUI countdownText;
+
+		/// <summary>
+		/// (specter) RoR2's own UI palette. Colors are hardcoded (color-picked off the real game),
+		/// not sampled at runtime - a real HGButton's Image.color is just a neutral white tint, its
+		/// visible color comes from the sprite texture, so there's nothing useful to read there.
+		/// Font is still sampled live, since that does read correctly.
+		/// </summary>
+		public static Color RoR2ButtonColor { get; private set; } = new Color(0.259f, 0.322f, 0.380f); // #425261
+		public static Color RoR2TextColor { get; private set; } = Color.white; // #ffffff
+		public static Color RoR2AccentColor { get; private set; } = new Color(0.902f, 0.271f, 0.243f); // #e6453e
+		public static Color RoR2MutedColor { get; private set; } = new Color(0.541f, 0.553f, 0.588f); // #8a8d96
+		public static TMPro.TMP_FontAsset RoR2Font { get; private set; }
+		public static Material RoR2FontMaterial { get; private set; }
+
+		private static void SampleRoR2Colors(HGButton sourceButton)
+		{
+			// (specter) Only the font is sampled live - colors are the hardcoded values above.
+			var text = sourceButton.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+			if (text != null)
+			{
+				RoR2Font = text.font;
+				RoR2FontMaterial = text.fontSharedMaterial;
+			}
+		}
+		/// <summary>
+		/// (specter) Main Panel is full-screen (its background needs to be, to cover edge-to-edge
+		/// like the real game's own menu backdrop), so the Credits/Discord/Back button clones -
+		/// positioned with raw pixel offsets relative to it, not anchor percentages - need their
+		/// own margin instead of inheriting one from Main Panel like they used to.
+		/// </summary>
+		private const float ScreenEdgeMargin = 60f;
+
 		private static bool ShowBackupWarning = true;
 		private static float BackupWarningTimer = 20f;
 		private const float BackupTimeout = 20f;
@@ -235,6 +270,14 @@ namespace Dodad.XSplitscreen.Components
 			int displayCount = Display.displays.Length;
 			if (displayCount == 1) return;
 
+			// (specter) No active camera rig exists outside a run - bail instead of crashing on
+			// an empty list.
+			if (CameraRigController.instancesList.Count == 0)
+			{
+				Log.Print("EnableMultiMonitorMode: no active CameraRigController to clone from yet, skipping", Log.ELogChannel.Warning);
+				return;
+			}
+
 			var mainCamera = CameraRigController.instancesList.First();
 
 			for (int i = 1; i < displayCount; i++)
@@ -309,9 +352,27 @@ namespace Dodad.XSplitscreen.Components
 			if (myMainMenuController == mainMenuController)
 				myMainMenuController = null;
 
+			ReleaseAllControllersToMain();
+
 			onExit.Invoke();
 
 			SplitScreenSettings.BatchSaveDirtyUsers();
+		}
+
+		/// <summary>
+		/// (specter) Returns every slot's controllers to the real Rewired main player before
+		/// leaving this menu - otherwise a controller stays stuck on a splitscreen slot after
+		/// backing out, since the main menu only reads "PlayerMain".
+		/// </summary>
+		private static void ReleaseAllControllersToMain()
+		{
+			if (LocalUserSlot.Instances == null) return;
+
+			foreach (var slot in LocalUserSlot.Instances.ToList())
+			{
+				if (slot != null && slot.LocalPlayer != null && slot.Panel != null)
+					slot.Panel.TryRemovePlayerFromSlot(slot.LocalPlayer, slot);
+			}
 		}
 
 		//-----------------------------------------------------------------------------------------------------------
@@ -384,7 +445,7 @@ namespace Dodad.XSplitscreen.Components
 			var backPanelRect = backPanelClone.GetComponent<RectTransform>();
 			backPanelRect.SetParent(mainPanel);
 			backPanelRect.offsetMax = new Vector2(700, 0);
-			backPanelRect.offsetMin = Vector2.zero;
+			backPanelRect.offsetMin = new Vector2(ScreenEdgeMargin, ScreenEdgeMargin);
 			backPanelRect.transform.localScale = Vector3.one;
 
 			// Back button setup
@@ -415,11 +476,15 @@ namespace Dodad.XSplitscreen.Components
 			var menuButtonPanelRect = menuButtonPanelClone.GetComponent<RectTransform>();
 			menuButtonPanelRect.SetParent(mainPanel);
 			menuButtonPanelRect.offsetMax = Vector2.zero;
-			menuButtonPanelRect.offsetMin = new Vector2(0, 160);
+			// (specter) Bottom margin needs enough clearance for the hover-description text (which
+			// sits at the bottom of this panel) to clear the Back panel below it (which only
+			// insets 60px from the screen bottom) - 160 wasn't enough and the two visually overlapped.
+			menuButtonPanelRect.offsetMin = new Vector2(ScreenEdgeMargin, 260);
 			menuButtonPanelRect.transform.localScale = Vector3.one;
 
 			// Discord button setup
 			discordButton = menuButtonPanelRect.Find("JuicePanel/GenericMenuButton (Infinite Tower)").GetComponent<HGButton>();
+			SampleRoR2Colors(discordButton); // (specter) before ClearHGButton touches anything else on it
 			discordButton.name = "Discord";
 			UIHelper.ClearHGButton(discordButton);
 			discordButton.GetComponentInChildren<LanguageTextMeshController>().token = "XSS_OPTION_DISCORD";
@@ -489,6 +554,12 @@ namespace Dodad.XSplitscreen.Components
 			creditsButton.transform.localScale = Vector3.one;
 			creditsButton.transform.SetSiblingIndex(0);
 			creditsButton.GetComponentInChildren<LanguageTextMeshController>().token = "XSS_CREDITS";
+			var creditsText = creditsButton.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+			if (creditsText != null)
+			{
+				creditsText.horizontalAlignment = TMPro.HorizontalAlignmentOptions.Center;
+				creditsText.verticalAlignment = TMPro.VerticalAlignmentOptions.Middle;
+			}
 			creditsButton.name = "Credits";
 			creditsButton.hoverToken = "XSS_CREDITS_HOVER";
 			creditsButton.GetComponent<MPEventSystemLocator>().Awake();
@@ -553,6 +624,61 @@ namespace Dodad.XSplitscreen.Components
 			textPrefabLang.token = "XSS_UNSET";
 
 			UIHelper.AddPrefab(UIHelper.EUIPrefabIndex.SimpleText, textPrefabLang.gameObject);
+
+			CreateCountdownBanner(assignmentPanel);
+
+			// (specter) Hint for the LB/RB "swap monitors" shortcut (LocalUserSlot.
+			// HandleDisplaySlotMovement) - gamepad-only (keyboard/mouse can't use it), shown
+			// statically for both platforms since a gamepad may join later. Only shown with
+			// more than one display to move a player to.
+			if (Display.displays.Length > 1)
+			{
+				var swapLegend = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
+				swapLegend.name = "SwapMonitorLegend";
+
+				// (specter) The SimpleText prefab's LanguageTextMeshController re-resolves its own
+				// .token onto the text every frame - with no token set here it kept stomping our
+				// glyph string back to its unset placeholder. Remove it; text is set once below.
+				var languageController = swapLegend.GetComponentInChildren<LanguageTextMeshController>();
+				if (languageController != null)
+					Destroy(languageController);
+
+				var legendText = swapLegend.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+				legendText.color = RoR2MutedColor;
+				// (specter) Bumped from 16 - the Xbox/PS glyphs (separate atlases, different native
+				// scales) looked small and mismatched at that size.
+				legendText.fontSize = 22;
+				legendText.horizontalAlignment = TMPro.HorizontalAlignmentOptions.Left;
+				legendText.verticalAlignment = TMPro.VerticalAlignmentOptions.Middle;
+
+				// (specter) Grouped by platform (all PlayStation, then all Xbox) rather than
+				// interleaved LB/L1 pairs - reads less jarring in same-family blocks.
+				var xbox = LocalUserSlot.GamepadGlyphs["xbox"];
+				var ps = LocalUserSlot.GamepadGlyphs["ps4"];
+				string psGlyphs = $"<sprite=\"{ps.asset}\" name=\"{ps.lb}\"><sprite=\"{ps.asset}\" name=\"{ps.rb}\">";
+				string xboxGlyphs = $"<sprite=\"{xbox.asset}\" name=\"{xbox.lb}\"><sprite=\"{xbox.asset}\" name=\"{xbox.rb}\">";
+				// (specter) Hardcoded rather than via RoR2.Language.GetString - the token kept
+				// resolving to a stale value (see Plugin.LoadLanguage's language.json merge), not
+				// worth chasing for a legend this minor.
+				legendText.text = $"{psGlyphs}  {xboxGlyphs}  Move to Another Display";
+
+				// (specter) Positioned relative to the Back button's own RectTransform, sharing its
+				// anchors AND pivot, rather than guessing at backPanelRect's anchor math (which
+				// landed near screen-center) or hardcoding pivot.y (which sat lower than "Back"
+				// whenever its actual pivot wasn't 0.5).
+				var backButtonRect = (RectTransform) backButton.transform;
+				float backButtonRightEdge = backButtonRect.anchoredPosition.x + backButtonRect.rect.width * (1f - backButtonRect.pivot.x);
+
+				swapLegend.transform.SetParent(backButton.transform.parent, false);
+				var legendRect = (RectTransform) swapLegend.transform;
+				legendRect.anchorMin = backButtonRect.anchorMin;
+				legendRect.anchorMax = backButtonRect.anchorMax;
+				legendRect.pivot = new Vector2(0f, backButtonRect.pivot.y);
+				legendRect.sizeDelta = new Vector2(560f, backButtonRect.rect.height);
+				legendRect.anchoredPosition = new Vector2(backButtonRightEdge + 20f, backButtonRect.anchoredPosition.y);
+
+				swapLegend.gameObject.SetActive(true);
+			}
 
 			AssignmentConfigurator.OnClaimUpdated += OnClaimUpdated;
 
@@ -626,8 +752,57 @@ namespace Dodad.XSplitscreen.Components
 			loadTimer = 5f;
 		}
 
+		/// <summary>
+		/// (specter) A small always-visible countdown, shown once every player is ready and the
+		/// game is about to auto-start - there was previously no feedback at all that this was
+		/// happening. Releasing a claimed region during the countdown cancels it (see OnClaimUpdated).
+		/// </summary>
+		private void CreateCountdownBanner(Transform assignmentPanel)
+		{
+			countdownBanner = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
+			countdownBanner.transform.SetParent(assignmentPanel, false);
+			countdownBanner.transform.SetAsFirstSibling();
+			countdownBanner.name = "CountdownBanner";
+
+			var rect = countdownBanner.GetComponent<RectTransform>();
+			rect.anchorMin = new Vector2(0f, 1f);
+			rect.anchorMax = new Vector2(1f, 1f);
+			rect.pivot = new Vector2(0.5f, 1f);
+			rect.sizeDelta = new Vector2(0f, 40f);
+			rect.anchoredPosition = Vector2.zero;
+
+			// (specter) Raw numeric text, not a localization token - drop the token-driven
+			// controller so it doesn't stomp the countdown text every frame.
+			Destroy(countdownBanner.GetComponentInChildren<LanguageTextMeshController>());
+
+			countdownText = countdownBanner.GetComponent<TMPro.TextMeshProUGUI>();
+			countdownText.color = new Color(0.227f, 0.820f, 0.361f); // (specter) matches the confirm-green used elsewhere
+			countdownText.fontSize = 24;
+
+			countdownBanner.SetActive(false);
+		}
+
+		private void UpdateCountdownBanner()
+		{
+			if (countdownBanner == null) return;
+
+			if (!AllowLoad)
+			{
+				if (countdownBanner.activeSelf)
+					countdownBanner.SetActive(false);
+				return;
+			}
+
+			if (!countdownBanner.activeSelf)
+				countdownBanner.SetActive(true);
+
+			countdownText.text = $"Starting in {Mathf.CeilToInt(loadTimer)}... release your region to cancel";
+		}
+
 		public void HandleLoadGame()
 		{
+			UpdateCountdownBanner();
+
 			if (!AllowLoad) return;
 
 			if (loadTimer > 0f)

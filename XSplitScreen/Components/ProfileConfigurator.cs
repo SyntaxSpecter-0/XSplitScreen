@@ -103,6 +103,7 @@ namespace Dodad.XSplitscreen.Components
 			_onProfileSelect += OnProfileSelected;
 
 			_isOpen = true;
+			IsConfirmed = Options.Slot.Profile != null;
 		}
 
 		/// <summary>
@@ -195,14 +196,15 @@ namespace Dodad.XSplitscreen.Components
 			_onProfileSelect -= OnProfileSelected;
 
 			_isOpen = false;
-
-			OnFinished();
+			IsConfirmed = true;
 		}
 
 		/// <summary>
-		/// Releases the current profile from the active list.
+		/// (specter) Releases the current profile. Internal so LocalUserSlot can call it on
+		/// removal - otherwise it only ran from OnDestroy, which doesn't fire when the slot
+		/// GameObject survives, leaving the profile/color/trails attached for the next occupant.
 		/// </summary>
-		private void ReleaseProfile()
+		internal void ReleaseProfile()
 		{
 			if (Options.Slot.Profile != null)
 				_activeProfiles.Remove(Options.Slot.Profile.fileName);
@@ -216,7 +218,8 @@ namespace Dodad.XSplitscreen.Components
 
 		public override void OnCancel()
 		{
-
+			if (Options.Slot.IsKeyboardUser)
+				OnFinished();
 		}
 
 		public override void OnConfirm()
@@ -260,18 +263,11 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		public override void ConfiguratorUpdate()
 		{
-			/*if (Options.Slot.Input.Up)
-			{
-				OnNavigate(-1);
-			}
-			else if (Options.Slot.Input.Down)
-			{
-				OnNavigate(1);
-			}
-			else */if (Options.Slot.Input.South)
-			{
+			// (specter) Up/Down is dispatched to OnNavigate by SlotOptions.
+			if (Options.Slot.Input.South)
 				OnConfirm();
-			}
+			else if (Options.Slot.Input.East)
+				OnCancel();
 		}
 
 		/// <summary>
@@ -279,8 +275,9 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void SelectPreviousProfile()
 		{
-			Log.Print($" ------------ Button Press (left) (ConfiguratorUpdate '{transform.parent.parent.name}') ------------");
+			Log.Print($" ------------ Button Press (previous) (ConfiguratorUpdate '{transform.parent.parent.name}') ------------");
 			_profileIndex = (int) Mathf.Clamp(_profileIndex - 1, 0, _profileKeys.Length - 1);
+			IsConfirmed = false;
 			UpdateProfileName();
 		}
 
@@ -289,8 +286,9 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void SelectNextProfile()
 		{
-			Log.Print($" ------------ Button Press (right) (ConfiguratorUpdate '{transform.parent.parent.name}') ------------");
+			Log.Print($" ------------ Button Press (next) (ConfiguratorUpdate '{transform.parent.parent.name}') ------------");
 			_profileIndex = (int) Mathf.Clamp(_profileIndex + 1, 0, _profileKeys.Length - 1);
+			IsConfirmed = false;
 			UpdateProfileName();
 		}
 

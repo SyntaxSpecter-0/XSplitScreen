@@ -76,15 +76,17 @@ namespace Dodad.XSplitscreen
 
 					if (child.rect.Contains(localPoint))
 					{
-						// Check for Selectable
-						var selectable = child.GetComponent<Selectable>();
-						if (selectable != null && selectable.IsInteractable())
-							return selectable;
-
-						// Traverse nested children
+						// (specter) Traverse nested children first - CarouselController carries its own
+						// Selectable on the same object that also parents its arrow buttons, so checking
+						// the outer one first would make the arrows unreachable.
 						var nested = FindSelectableRecursive(child, cursorWorldPos);
 						if (nested != null)
 							return nested;
+
+						// (specter) Fall back to this child's own Selectable
+						var selectable = child.GetComponent<Selectable>();
+						if (selectable != null && selectable.IsInteractable())
+							return selectable;
 					}
 				}
 				return null;

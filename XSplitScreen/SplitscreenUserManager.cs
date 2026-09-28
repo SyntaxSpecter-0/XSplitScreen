@@ -1,4 +1,5 @@
-﻿using Rewired;
+﻿using Dodad.XSplitscreen.Components;
+using Rewired;
 using RoR2;
 using RoR2.UI.MainMenu;
 using System;
@@ -149,7 +150,29 @@ namespace Dodad.XSplitscreen
 			RoR2Application.SetIsInLocalMultiplayer(true);
 			LoadLocalUsers();
 			OnStateChange?.Invoke(true);
-			TransitionToLobby(gamemode);
+			WaitForEntitlementsThenTransition(gamemode, retriesLeft: 120);
+		}
+
+		/// <summary>
+		/// (specter) Waits for RoR2Application.IsAllUsersEntitlementsUpdated before transitioning -
+		/// vanilla's RunCameraManager.Update indexes its camera dictionary with no existence check,
+		/// and a non-host camera isn't created until entitlements resolve. Doesn't fully close the
+		/// gap on its own (CharacterSelectController re-triggers the same check on scene entry, see
+		/// Plugin.RunCameraManager_Update_Finalizer for the actual safety net), but shrinks how
+		/// often that fallback fires. Falls back to transitioning after ~2s regardless.
+		/// </summary>
+		private static void WaitForEntitlementsThenTransition(string gamemode, int retriesLeft)
+		{
+			if (!isSplitscreenEnabled)
+				return; // (specter) splitscreen was disabled again before this ever got to transition
+
+			if (RoR2Application.IsAllUsersEntitlementsUpdated || retriesLeft <= 0)
+			{
+				TransitionToLobby(gamemode);
+				return;
+			}
+
+			ExecuteNextFrame.Invoke(() => WaitForEntitlementsThenTransition(gamemode, retriesLeft - 1));
 		}
 
 		/// <summary>
@@ -203,7 +226,11 @@ namespace Dodad.XSplitscreen
 		{
 			localUsers.Clear();
 
-			var profile = LocalUserManager.localUsersList[0].userProfile;
+			// (specter) Falls back to the platform's default profile (same as vanilla's own
+			// bootstrap) rather than crashing if localUsersList is ever unexpectedly empty here.
+			var profile = LocalUserManager.localUsersList.Count > 0
+				? LocalUserManager.localUsersList[0].userProfile
+				: PlatformSystems.saveSystem.userProfile;
 
 			var playerMain = ReInput.players.GetPlayer("PlayerMain");
 

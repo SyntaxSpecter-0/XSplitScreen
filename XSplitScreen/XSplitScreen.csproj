@@ -66,19 +66,24 @@
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="R2API.ContentManagement">
-			<HintPath>G:\SteamLibrary\steamapps\common\Risk of Rain 2\BepInEx\plugins\RiskofThunder-R2API_ContentManagement\R2API.ContentManagement\R2API.ContentManagement.dll</HintPath>
+			<HintPath>r2api\R2API.ContentManagement.dll</HintPath>
+			<Private>false</Private>
 		</Reference>
 		<Reference Include="R2API.Core">
-			<HintPath>G:\SteamLibrary\steamapps\common\Risk of Rain 2\BepInEx\plugins\RiskofThunder-R2API_Core\R2API.Core\R2API.Core.dll</HintPath>
+			<HintPath>r2api\R2API.Core.dll</HintPath>
+			<Private>false</Private>
 		</Reference>
 		<Reference Include="R2API.Items">
-			<HintPath>G:\SteamLibrary\steamapps\common\Risk of Rain 2\BepInEx\plugins\RiskofThunder-R2API_Items\R2API.Items\R2API.Items.dll</HintPath>
+			<HintPath>r2api\R2API.Items.dll</HintPath>
+			<Private>false</Private>
 		</Reference>
 		<Reference Include="R2API.Language">
-			<HintPath>G:\SteamLibrary\steamapps\common\Risk of Rain 2\BepInEx\plugins\RiskofThunder-R2API_Language\R2API.Language\R2API.Language.dll</HintPath>
+			<HintPath>r2api\R2API.Language.dll</HintPath>
+			<Private>false</Private>
 		</Reference>
 		<Reference Include="R2API.Prefab">
-			<HintPath>G:\SteamLibrary\steamapps\common\Risk of Rain 2\BepInEx\plugins\RiskofThunder-R2API_Prefab\R2API.Prefab\R2API.Prefab.dll</HintPath>
+			<HintPath>r2api\R2API.Prefab.dll</HintPath>
+			<Private>false</Private>
 		</Reference>
 		<Reference Include="Rewired_Windows_Lib">
 			<HintPath>libs\Rewired_Windows_Lib.dll</HintPath>
@@ -90,12 +95,12 @@
 		</Reference>
 	</ItemGroup>
 
-	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Command="copy /Y &quot;$(TargetPath)&quot; &quot;C:\Users\Marcus\AppData\Roaming\r2modmanPlus-local\RiskOfRain2\profiles\Default\BepInEx\plugins\dodad-XSplitScreen\&quot;" />
-	</Target>
-
-	<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-	  <Exec Command="copy /Y &quot;E:\Development\Modding\Risk of Rain 2\Bundles\xsplitscreenbundle&quot; &quot;E:\Development\Modding\Risk of Rain 2\Projects\XSplitScreen\XSplitScreen\xsplitscreenbundle&quot;" />
-	</Target>
+	<!--
+	  The original PostBuild/PreBuild targets here copied the built DLL and the
+	  asset bundle to the original author's local machine paths
+	  (C:\Users\Marcus\... and E:\Development\...). Those paths don't exist on
+	  this machine, so they're removed for local dev. The committed
+	  xsplitscreenbundle is used as-is; deploy the built DLL manually.
+	-->
 
 </Project>
