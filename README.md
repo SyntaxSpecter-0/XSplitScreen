@@ -30,42 +30,49 @@ Splitscreen for Risk of Rain 2 with UI-based persistent preferences
 
 <details>
 <summary>Why is there only 1 profile available to use?</summary>
+<br>
 
 Go back to the main menu and click on "Profile: " at the top right of the screen. Create a new profile and try again.
 </details>
 
 <details>
 <summary>Does the mod support multiple keyboards and mice?</summary>
+<br>
 
 No. This is a limitation in Risk of Rain 2 and therefore will never be supported. Use [Nucleus](https://nucleus-coop.github.io/) instead.
 </details>
 
 <details>
 <summary>How do I disable multi-monitor mode?</summary>
+<br>
 
 Disabling activated displays in Unity is impossible. This means that to disable multi-monitor mode you must restart the game.
 </details>
 
 <details>
 <summary>Does every player need their own controller?</summary>
+<br>
 
 No. One player can use keyboard and mouse, and every other player needs their own controller.
 </details>
 
 <details>
 <summary>Do all players share the same audio?</summary>
+<br>
 
 Yes. All players hear the same audio output from the one PC.
 </details>
 
 <details>
 <summary>The mod isn't showing up, or the game crashes on launch. What do I do?</summary>
+<br>
 
 Make sure you have all of the required R2API dependencies installed and up to date. If it's still not working, check your BepInEx log for errors.
 </details>
 
 <details>
 <summary>My issue isn't listed. What do I do?</summary>
+<br>
 
 [Open a GitHub issue](https://github.com/SyntaxSpecter-0/XSplitScreen/issues) or [join the Discord](https://discord.gg/maHhJSv62G) for support.
 </details>
