@@ -6,7 +6,6 @@ using System.Reflection;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using static RoR2.MasterSpawnSlotController;
 
 namespace Dodad.XSplitscreen.Components
 {
@@ -262,14 +261,12 @@ namespace Dodad.XSplitscreen.Components
 				.ToList();
 		}
 
-
 		#endregion
 
 		#region Navigation Methods
 
 		private void SubscribeToSlot()
 		{
-			Slot.OnNavigateIndex += OnNavigateIndex;
 			Slot.OnCancel += OnCancel;
 			Slot.OnLoadProfile += OnLoadProfile;
 			Slot.OnUnloadProfile += OnUnloadProfile;
@@ -289,18 +286,6 @@ namespace Dodad.XSplitscreen.Components
 
 			DisplayOptionName();
 		}
-
-		/// <summary>
-		/// (specter) Moves to the next configurator in the list (keyboard flow).
-		/// </summary>
-		private void NextConfigurator() =>
-			_configuratorIndex = Mathf.Clamp(_configuratorIndex + 1, 0, ActiveList.Count - 1);
-
-		/// <summary>
-		/// (specter) Moves to the previous configurator in the list (keyboard flow).
-		/// </summary>
-		private void PreviousConfigurator() =>
-			_configuratorIndex = Mathf.Clamp(_configuratorIndex - 1, 0, ActiveList.Count - 1);
 
 		/// <summary>
 		/// (specter) Switches the active tab within the gamepad flow's cyclable list, wrapping
@@ -335,40 +320,6 @@ namespace Dodad.XSplitscreen.Components
 		{
 			if (IsExpanded)
 				ActiveList[_configuratorIndex].OnCancel();
-		}
-
-		private void OnNavigateIndex(int index)
-		{
-			if (!IsExpanded)
-			{
-				_configuratorIndex = index;
-
-				DisplayOptionName();
-			}
-			else
-			{
-				ActiveList[_configuratorIndex].OnNavigateIndex(index);
-			}
-		}
-
-		/// <summary>
-		/// (specter) Handles vertical navigation input from UI buttons (keyboard flow).
-		/// </summary>
-		private void OnNavigate(int direction)
-		{
-			if (!IsExpanded)
-			{
-				if (direction == -1)
-					PreviousConfigurator();
-				else
-					NextConfigurator();
-
-				DisplayOptionName();
-			}
-			else if (ActiveList.Count > 0)
-			{
-				ActiveList[_configuratorIndex].OnNavigate(direction);
-			}
 		}
 
 		/// <summary>
@@ -485,6 +436,18 @@ namespace Dodad.XSplitscreen.Components
 			var valueText = valueTextTransform.GetComponent<TextMeshProUGUI>();
 			valueText.text = token == null ? "" : ResolveToken(token);
 			valueText.color = color;
+			// (specter) No size floor means a long value forces siblings (glyphs, accent bar) to
+			// overflow instead. Let it shrink first.
+			valueText.enableAutoSizing = true;
+			valueText.fontSizeMin = 12;
+			valueText.fontSizeMax = 19;
+			// (specter) Baked prefab LayoutElement has minWidth=140, a rigid floor same as the
+			// NameText issue above - lower it so the box can actually shrink under pressure.
+			var valueLayout = valueTextTransform.GetComponent<LayoutElement>();
+			if (valueLayout != null)
+				valueLayout.minWidth = 50;
+
+			LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform) panel);
 		}
 
 		#endregion

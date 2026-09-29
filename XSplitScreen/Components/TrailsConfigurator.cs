@@ -59,13 +59,6 @@ namespace Dodad.XSplitscreen.Components
 			UpdateMessage();
 		}
 
-		public override void OnNavigateIndex(int index)
-		{
-			TrailIndex = index;
-			IsConfirmed = false;
-			UpdateMessage();
-		}
-
 		public override void Open()
 		{
 			UpdateMessage();

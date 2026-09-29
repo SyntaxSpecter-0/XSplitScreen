@@ -251,13 +251,6 @@ namespace Dodad.XSplitscreen.Components
 			UpdateNavigatorIndex();
 		}
 
-		public override void OnNavigateIndex(int index)
-		{
-			_profileIndex = (int) Mathf.Clamp(index, 0, _profileKeys.Length - 1);
-			UpdateProfileName();
-			UpdateNavigatorIndex();
-		}
-
 		/// <summary>
 		/// Updates the configurator based on input.
 		/// </summary>

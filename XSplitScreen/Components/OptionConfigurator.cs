@@ -71,12 +71,6 @@ namespace Dodad.XSplitscreen.Components
 		public abstract void OnNavigate(int direction);
 
 		/// <summary>
-		/// Handles navigation input from mouse click
-		/// </summary>
-		/// <param name="direction"></param>
-		public abstract void OnNavigateIndex(int index);
-
-		/// <summary>
 		/// Handles navigation input from mouse.
 		/// </summary>
 		public abstract void OnCancel();

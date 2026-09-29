@@ -126,7 +126,7 @@ namespace Dodad.XSplitscreen.Components
 
 				Log.Print($"LocalUserPanel.TryAddControllersToSlot: '{panel.name}' adding new player '{freePlayer.name}', slot '{freeSlot.name}' (existing slot is null)");
 
-				foreach(var controller in controllers)
+				foreach (var controller in controllers)
 					freePlayer.controllers.AddController(controller, !(controller is Keyboard || controller is Mouse));
 
 				freeSlot.LocalPlayer = freePlayer;
@@ -179,7 +179,6 @@ namespace Dodad.XSplitscreen.Components
 
 			// (specter) into one of the 2 columns, not Content directly - see Initialize().
 			slot.transform.SetParent(GetTargetColumn());
-			//slot.transform.localScale = Vector3.one;
 
 			if (transform.childCount == MAX_USERS)
 				Destroy(freeSlot.gameObject);
@@ -258,7 +257,7 @@ namespace Dodad.XSplitscreen.Components
 				SplitscreenMenuController.Singleton.onEnter.AddListener(OnEnter);
 				SplitscreenMenuController.Singleton.onExit.AddListener(OnExit);
 			}
-			catch(Exception e)
+			catch (Exception e)
 			{
 				Log.Print(e, Log.ELogChannel.Fatal);
 
@@ -271,11 +270,8 @@ namespace Dodad.XSplitscreen.Components
 		/// <summary>
 		/// Add a new slot tracker
 		/// </summary>
-		/// <returns></returns>
 		internal void AddSlot()
 		{
-			//Log.Print($"[{this.GetType().Name}.{MethodBase.GetCurrentMethod().Name}]");
-
 			var newSlot = GameObject.Instantiate(userPrefab, GetTargetColumn());
 
 			newSlot.gameObject.AddComponent<LocalUserSlot>();
@@ -347,7 +343,7 @@ namespace Dodad.XSplitscreen.Components
 			var players = ReInput.players.Players;
 			int playerCount = players.Count;
 
-			for(int e = 1; e < playerCount; e++)
+			for (int e = 1; e < playerCount; e++)
 			{
 				if (players[e].controllers.joystickCount == 0 && !players[e].controllers.hasKeyboard)
 					return players[e];
@@ -416,7 +412,7 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void OnExit()
 		{
-			if(subscribed)
+			if (subscribed)
 			{
 				ReInput.ControllerConnectedEvent -= OnControllerAddedEvent;
 				subscribed = false;
@@ -442,7 +438,7 @@ namespace Dodad.XSplitscreen.Components
 				return;
 			}
 
-			foreach(var slot in LocalUserSlot.Instances)
+			foreach (var slot in LocalUserSlot.Instances)
 			{
 				if (slot.LocalPlayer != null &&
 					slot.LocalPlayer.controllers.Controllers.Count() == 0)

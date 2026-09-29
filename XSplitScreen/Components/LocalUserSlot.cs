@@ -105,6 +105,8 @@ namespace Dodad.XSplitscreen.Components
 
 				if (_nameText != null)
 					_nameText.text = value != null ? value.name : "Player";
+				if (_readyCheck != null)
+					_readyCheck.SetActive(value != null);
 
 				OnLoadProfile?.Invoke();
 			}
@@ -117,7 +119,6 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		public bool IsKeyboardUser => LocalPlayer?.controllers.hasKeyboard ?? false;
 
-		public Action<int> OnNavigateIndex;
 		public Action OnCancel;
 		public Action OnUnloadProfile;
 		public Action OnLoadProfile;
@@ -151,7 +152,6 @@ namespace Dodad.XSplitscreen.Components
 
 		// (specter) UI elements - matches the userslot.prefab layout (collapsed row that expands in place)
 		private Image _deviceIcon;
-		private Transform _configuratorContainer; // (specter) CollapsedRow - always active, hosts SlotOptions
 		private Transform _collapsedRow;
 		private Transform _expandedContent;
 		private Image _accentStrip;
@@ -161,6 +161,7 @@ namespace Dodad.XSplitscreen.Components
 		private GameObject _readyCheck;
 		private MPButton _yToggleButton;
 		private RectTransform _yChevron;
+		private GameObject _configureSpacer;
 		private SlotOptions _options;
 		private TextMeshProUGUI _yLabel, _lbLabel, _rbLabel;
 		private TextMeshProUGUI[] _aButtonLabels;
@@ -205,7 +206,7 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		/// <summary>
-		/// (specter) Shows/hides ExpandedContent to match SlotOptions.IsExpanded, and flips the chevron.
+		/// (specter) Shows/hides ExpandedContent to match SlotOptions.IsExpanded.
 		/// </summary>
 		private void UpdateExpandedVisibility()
 		{
@@ -213,8 +214,6 @@ namespace Dodad.XSplitscreen.Components
 
 			if (_expandedContent.gameObject.activeSelf != expanded)
 				_expandedContent.gameObject.SetActive(expanded);
-
-			_yChevron.localRotation = Quaternion.Euler(0, 0, expanded ? 180f : 0f);
 		}
 
 		/// <summary>
@@ -253,8 +252,7 @@ namespace Dodad.XSplitscreen.Components
 		{
 			// (specter) Lives on CollapsedRow, not ExpandedContent, so it keeps running while
 			// collapsed - it's what detects the Y press that opens the panel.
-			_configuratorContainer = transform.Find("CollapsedRow");
-			_options = _configuratorContainer.gameObject.AddComponent<SlotOptions>();
+			_options = transform.Find("CollapsedRow").gameObject.AddComponent<SlotOptions>();
 		}
 
 		/// <summary>
@@ -275,12 +273,32 @@ namespace Dodad.XSplitscreen.Components
 			_collapsedRow = transform.Find("CollapsedRow");
 			_expandedContent = transform.Find("ExpandedContent");
 
+			// (specter) Row is packed with zero slack even at rest - nothing shrinks further to
+			// absorb ReadyCheck's spacing gap when it turns on. Trim spacing to buy that room back.
+			var collapsedHorizontal = _collapsedRow.GetComponent<HorizontalLayoutGroup>();
+			if (collapsedHorizontal != null)
+				collapsedHorizontal.spacing = 10;
+
 			_deviceIcon = _collapsedRow.Find("DeviceIcon").GetComponent<Image>();
 			_deviceIcon.enabled = false;
 
 			_accentStrip = _collapsedRow.Find("AccentStrip").GetComponent<Image>();
 			_nameText = _collapsedRow.Find("NameText").GetComponent<TextMeshProUGUI>();
+			// (specter) Auto-sizing alone only shrinks text within a box already assigned - it
+			// doesn't shrink what width TMP itself requests from the layout system. Needs an
+			// explicit LayoutElement floor too, or a long name still forces siblings to overflow.
+			_nameText.enableAutoSizing = true;
+			_nameText.fontSizeMin = 10;
+			_nameText.fontSizeMax = 17;
+			var nameLayout = _nameText.gameObject.AddComponent<LayoutElement>();
+			nameLayout.flexibleWidth = 1;
+			nameLayout.minWidth = 40;
 			_readyCheck = _collapsedRow.Find("ReadyCheck").gameObject;
+			// (specter) Baked minWidth=20 is a hard floor it can't shrink below - let it compress
+			// like every other glyph so turning it on doesn't force the row wider.
+			var readyLayout = _readyCheck.GetComponent<LayoutElement>();
+			if (readyLayout != null)
+				readyLayout.minWidth = 0;
 
 			// (specter) Localized "press start" placeholder, using RoR2's own SimpleText prefab in
 			// place of the plain placeholder Text the prefab-builder script left here.
@@ -318,22 +336,64 @@ namespace Dodad.XSplitscreen.Components
 			_yToggleButton = yToggle.gameObject.AddComponent<MPButton>();
 			_yToggleButton.allowAllEventSystems = true;
 			_yToggleButton.onClick.AddListener(() => _options.ToggleExpanded());
-			_yChevron = yToggle.Find("Chevron").GetComponent<RectTransform>();
-			_yChevron.gameObject.SetActive(false); // (specter) deemed unneeded - revert: remove this line
 			_yLabel = yToggle.Find("YCircle/Label").GetComponent<TextMeshProUGUI>();
 			_yOutline = yToggle.Find("YCircle").GetComponent<Outline>();
+
+			// (specter) Bumped up from the baked 20x20/11pt - too small next to the other enlarged
+			// glyphs. No minWidth/Height floor, same reasoning as SetGlyphBoxSize below.
+			var yCircleLayout = yToggle.Find("YCircle").GetComponent<LayoutElement>();
+			yCircleLayout.preferredWidth = 28;
+			yCircleLayout.preferredHeight = 28;
+			_yLabel.fontSize = 17;
+
+			// (specter) The chevron (open/closed indicator) was deemed unneeded - repurposed the
+			// same node into a plain "Configure" label, but pulled OUT of yToggle (which is just
+			// the click target + glyph) and reparented directly under CollapsedRow with its own
+			// flexible spacer, so it floats near the check mark instead of being glued to the
+			// glyph - the glyph then naturally settles against the row's right edge on its own.
+			_yChevron = yToggle.Find("Chevron").GetComponent<RectTransform>();
+			_yChevron.SetParent(_collapsedRow, false);
+			_yChevron.SetSiblingIndex(yToggle.GetSiblingIndex());
+			var configureLabel = _yChevron.GetComponent<TextMeshProUGUI>();
+			configureLabel.text = "Configure";
+			configureLabel.color = SplitscreenMenuController.RoR2TextColor;
+			// (specter) Unset minWidth defers to TMP's own unwrapped-text width, which is rigid -
+			// same bug as NameText/ValueText. Auto-size + explicit low minWidth fixes it here too.
+			configureLabel.enableAutoSizing = true;
+			configureLabel.fontSizeMin = 9;
+			configureLabel.fontSizeMax = 13;
+			var configureLayout = _yChevron.GetComponent<LayoutElement>();
+			configureLayout.preferredWidth = 100;
+			configureLayout.minWidth = 20;
+
+			// (specter) Second flexible spacer, between the new Configure label and the glyph -
+			// splits the row's remaining space so the glyph settles near the right edge instead of
+			// sitting immediately next to the text.
+			_configureSpacer = new GameObject("ConfigureSpacer", typeof(RectTransform));
+			_configureSpacer.transform.SetParent(_collapsedRow, false);
+			_configureSpacer.transform.SetSiblingIndex(yToggle.GetSiblingIndex());
+			// (specter) minWidth guarantees a visible gap even when the row is tight on space (a
+			// long player name can leave the flexible spacers almost no leftover room to split) -
+			// small enough that it isn't the overflow risk the old 80px Configure floor was.
+			var configureSpacerLayout = _configureSpacer.AddComponent<LayoutElement>();
+			configureSpacerLayout.flexibleWidth = 1;
+			configureSpacerLayout.minWidth = 16;
 
 			var lbButtonNode = _expandedContent.Find("TabBar/LBButton");
 			var lbButton = lbButtonNode.gameObject.AddComponent<MPButton>();
 			lbButton.allowAllEventSystems = true;
 			lbButton.onClick.AddListener(() => _options.ClickShoulder(-1));
 			_lbLabel = lbButtonNode.Find("Label").GetComponent<TextMeshProUGUI>();
+			SetGlyphBoxSize(_lbLabel, 28);
+			SetGlyphBoxSize(lbButtonNode.Find("Chevron").GetComponent<TextMeshProUGUI>(), 16);
 
 			var rbButtonNode = _expandedContent.Find("TabBar/RBButton");
 			var rbButton = rbButtonNode.gameObject.AddComponent<MPButton>();
 			rbButton.allowAllEventSystems = true;
 			rbButton.onClick.AddListener(() => _options.ClickShoulder(1));
 			_rbLabel = rbButtonNode.Find("Label").GetComponent<TextMeshProUGUI>();
+			SetGlyphBoxSize(_rbLabel, 28);
+			SetGlyphBoxSize(rbButtonNode.Find("Chevron").GetComponent<TextMeshProUGUI>(), 16);
 
 			_aButtonLabels = new TextMeshProUGUI[3];
 			_aButtonOutlines = new Outline[3];
@@ -362,9 +422,29 @@ namespace Dodad.XSplitscreen.Components
 				var content = _expandedContent.Find(valuePanelNames[i]);
 				_upArrowLabels[i] = content.Find("UpArrow").GetComponent<TextMeshProUGUI>();
 				_downArrowLabels[i] = content.Find("DownArrow").GetComponent<TextMeshProUGUI>();
+				SetGlyphBoxSize(_upArrowLabels[i], 30);
+				SetGlyphBoxSize(_downArrowLabels[i], 30);
 			}
 
 			UpdateInputGlyphs();
+		}
+
+		/// <summary>
+		/// (specter) These labels have no baked LayoutElement, so their layout groups (with
+		/// childControlWidth/Height enabled) size them off TMP's own auto-computed preferred size.
+		/// A sprite glyph at a bumped font size reports a much larger preferred size than the
+		/// original single-character text did, ballooning the whole row/panel around it. Pin a
+		/// fixed box instead so a bigger glyph can't resize its neighbors.
+		/// </summary>
+		// (specter) Unmodified minWidth/Height default to -1, which defers to TMP's own reported
+		// minimum - still large for a sprite glyph. Set explicitly small so it can actually shrink.
+		private static void SetGlyphBoxSize(TextMeshProUGUI label, float size)
+		{
+			var layout = label.GetComponent<LayoutElement>() ?? label.gameObject.AddComponent<LayoutElement>();
+			layout.preferredWidth = size;
+			layout.preferredHeight = size;
+			layout.minWidth = 0;
+			layout.minHeight = 0;
 		}
 
 		/// <summary>
@@ -425,6 +505,17 @@ namespace Dodad.XSplitscreen.Components
 				foreach (var label in _downArrowLabels)
 					label.text = "▼";
 			}
+
+			// (specter) Bumped up from the baked prefab sizes (9-15) - the configure menu's glyphs
+			// read as too small at their original text-sized dimensions.
+			_lbLabel.fontSize = 16;
+			_rbLabel.fontSize = 16;
+			foreach (var label in _aButtonLabels)
+				label.fontSize = 18;
+			foreach (var label in _upArrowLabels)
+				label.fontSize = 20;
+			foreach (var label in _downArrowLabels)
+				label.fontSize = 20;
 
 			// (specter) Reuse RoR2's own button color for the badge outlines instead of a guessed hex value.
 			var outlineColor = SplitscreenMenuController.RoR2ButtonColor;
@@ -596,7 +687,7 @@ namespace Dodad.XSplitscreen.Components
 			if (!LocalUserPanel.AllowChanges)
 				return;
 
-			if(!_options.IsExpanded)
+			if (!_options.IsExpanded)
 			{
 				bool isKeyboard = IsKeyboardUser;
 
@@ -699,23 +790,22 @@ namespace Dodad.XSplitscreen.Components
 			_deviceIcon.enabled = isOccupied;
 			_accentStrip.gameObject.SetActive(isOccupied);
 			_nameText.gameObject.SetActive(isOccupied);
-			_readyCheck.SetActive(isOccupied);
+			_readyCheck.SetActive(isOccupied && Profile != null);
 			_yToggleButton.gameObject.SetActive(isOccupied);
+			_yChevron.gameObject.SetActive(isOccupied); // (specter) "Configure" label - lives outside yToggle now, needs its own toggle
+			_configureSpacer.SetActive(isOccupied);
 			_titleTextGO.SetActive(!isOccupied);
 			_options.enabled = isOccupied;
 
 			if (!isOccupied)
-				_expandedContent.gameObject.SetActive(false);
-
-			if(!isOccupied)
 			{
+				_expandedContent.gameObject.SetActive(false);
 				OnRemovedKeyboardUser += RefreshIfEmpty;
 			}
 			else
 			{
 				OnRemovedKeyboardUser -= RefreshIfEmpty;
 			}
-
 		}
 
 		private void RefreshIfEmpty()
@@ -961,7 +1051,7 @@ namespace Dodad.XSplitscreen.Components
 				bool northValue = player.GetButtonDown(NorthButtonId);
 				bool lbValue = player.GetButtonDown(9);
 				bool rbValue = player.GetButtonDown(10);
-;
+
 				if (player.controllers.hasKeyboard)
 				{
 					// (specter) Keyboard scheme: Tab opens/closes the panel, Q/E switch tabs, Up/Down

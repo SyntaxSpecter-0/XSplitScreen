@@ -75,8 +75,6 @@ namespace Dodad.XSplitscreen.Components
 		// selection states) - Up/Down navigation no longer applies here.
 		public override void OnNavigate(int direction) { }
 
-		public override void OnNavigateIndex(int direction) { }
-
 		public override void OnCancel()
 		{
 			// (specter) Gamepad: East no longer closes the panel here (only North/Y does) - the

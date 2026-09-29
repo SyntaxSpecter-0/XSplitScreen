@@ -216,11 +216,6 @@ namespace Dodad.XSplitscreen.Components
 
 		}
 
-		public override void OnNavigateIndex(int direction)
-		{
-
-		}
-
 		public override void Open()
 		{
 			_showCursor = !Options.Slot.IsKeyboardUser;

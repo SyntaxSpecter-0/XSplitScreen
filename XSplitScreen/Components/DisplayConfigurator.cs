@@ -50,11 +50,6 @@ namespace Dodad.XSplitscreen.Components
 			Options.OpenConfigurator();
 		}
 
-		public override void OnNavigateIndex(int index)
-		{
-
-		}
-
 		public override bool CanOpen() => true;
 
 		public override void Open()
