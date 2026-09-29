@@ -1,9 +1,8 @@
 # XSplitScreen
 
-[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
-[![GitHub last commit](https://img.shields.io/github/last-commit/SyntaxSpecter-0/XSplitScreen)](https://github.com/SyntaxSpecter-0/XSplitScreen/commits)
-[![GitHub issues](https://img.shields.io/github/issues/SyntaxSpecter-0/XSplitScreen)](https://github.com/SyntaxSpecter-0/XSplitScreen/issues)
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/maHhJSv62G)
+[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE.txt)
+[![GitHub issues](https://img.shields.io/github/issues/SyntaxSpecter-0/XSplitScreen?style=for-the-badge)](https://github.com/SyntaxSpecter-0/XSplitScreen/issues)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/maHhJSv62G)
 
 # Description
 
