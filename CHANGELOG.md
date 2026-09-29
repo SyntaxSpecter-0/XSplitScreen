@@ -19,7 +19,8 @@
 
 **4.0.6**
 
-- Added controller support improvements
+- Added a Game Mode selector to the splitscreen menu, so the chosen mode is used when launching
+- Reworked how multiplayer player colors are applied, fixing a conflict with other mods that also patch player colors
 
 **4.0.5**
 
