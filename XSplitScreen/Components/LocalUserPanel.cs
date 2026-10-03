@@ -319,18 +319,16 @@ namespace Dodad.XSplitscreen.Components
 
 		internal LocalUserSlot GetFreeSlot()
 		{
-			foreach (var instance in LocalUserSlot.Instances)
-			{
-				// (specter) slots live inside one of the 2 columns now, not directly under
-				// userContainer (Content) - see Initialize().
-				if (instance.transform.parent != _columnLeft && instance.transform.parent != _columnRight)
-					continue;
-
-				if (instance.LocalPlayer == null)
-					return instance;
-			}
-
-			return null;
+			// (specter) LocalUserSlot.Instances is ordered by creation, not by on-screen position -
+			// picking the first free one in that order could land a new player in the right column
+			// while a slot higher up the left column sits empty (e.g. right after someone leaves).
+			// Sort by actual reading order (left column top-to-bottom, then right) instead.
+			return LocalUserSlot.Instances
+				.Where(instance => instance.LocalPlayer == null &&
+					(instance.transform.parent == _columnLeft || instance.transform.parent == _columnRight))
+				.OrderBy(instance => instance.transform.parent == _columnLeft ? 0 : 1)
+				.ThenBy(instance => instance.transform.GetSiblingIndex())
+				.FirstOrDefault();
 		}
 
 		//-----------------------------------------------------------------------------------------------------------

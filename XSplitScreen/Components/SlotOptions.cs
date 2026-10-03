@@ -59,6 +59,19 @@ namespace Dodad.XSplitscreen.Components
 		private Transform[] _tabNodes;
 
 		/// <summary>
+		/// (specter) Coverflow tab bar: all 3 tabs stay visible, one Centered and the other two
+		/// shrunk/dimmed to Left/Right. Plain per-frame Lerp, not UIJuice - its internals are
+		/// stripped in the stub assembly this mod compiles against.
+		/// </summary>
+		private enum TabRole { Center, Left, Right }
+		private TabRole[] _tabRoles;
+		private CanvasGroup[] _tabCanvasGroups;
+
+		private const float CarouselSideOffset = 85f;
+		private const float CarouselSideScale = 0.62f;
+		private const float CarouselSideAlpha = 0.45f;
+
+		/// <summary>
 		/// (specter) Each tab's content panel (ProfileContent/ColorContent/TrailsContent), keyed
 		/// by configurator type since panel shape differs per type.
 		/// </summary>
@@ -102,6 +115,22 @@ namespace Dodad.XSplitscreen.Components
 				tabsContainer.Find("Tab1"),
 				tabsContainer.Find("Tab2"),
 			};
+
+			// (specter) Pulled out of TabsContainer's layout flow and positioned by hand per TabRole.
+			_tabRoles = new TabRole[_tabNodes.Length];
+			_tabCanvasGroups = new CanvasGroup[_tabNodes.Length];
+			for (int i = 0; i < _tabNodes.Length; i++)
+			{
+				_tabNodes[i].gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+				_tabCanvasGroups[i] = _tabNodes[i].gameObject.AddComponent<CanvasGroup>();
+			}
+			// (specter) Snap to starting roles immediately - _configuratorIndex is 0 before the
+			// first Open(), so index 0 starts Center, the last tab starts Left, the rest Right.
+			for (int i = 0; i < _tabNodes.Length; i++)
+			{
+				_tabRoles[i] = i == 0 ? TabRole.Center : i == _tabNodes.Length - 1 ? TabRole.Left : TabRole.Right;
+				SnapTabToRole(i);
+			}
 
 			_contentPanels = new Dictionary<System.Type, Transform>
 			{
@@ -149,19 +178,17 @@ namespace Dodad.XSplitscreen.Components
 			_assignmentConfigurator?.ConfiguratorUpdate();
 
 			UpdateInputFlow();
+			AnimateTabCarousel();
 		}
 
 		/// <summary>
 		/// (specter) North opens/closes the panel; LB/RB switch tabs while open; the active tab
-		/// reads its own axis and confirms via South internally. Same shape for keyboard and
-		/// gamepad now - Tab/Q/E/Enter/Escape map to North/LB/RB/South/East respectively (see
-		/// InputBank).
+		/// reads its own axis and confirms via South. Keyboard maps Tab/Q/E/Enter/Escape to the same.
 		/// </summary>
 		private void UpdateInputFlow()
 		{
-			// (specter) Available regardless of panel state - previously only worked while
-			// collapsed, but panels now commonly stay open (no more auto-close-on-confirm), so
-			// there was often no way to hold-to-remove a player at all.
+			// (specter) Works regardless of panel state - panels now commonly stay open, so this is
+			// the only way to hold-to-remove a player.
 			HandleHoldToRemove();
 
 			if (Slot.Input.North)
@@ -190,7 +217,7 @@ namespace Dodad.XSplitscreen.Components
 			else if (Slot.Input.Down)
 				_cyclable[_configuratorIndex].OnNavigate(1);
 
-			DisplayOptionName(); // (specter) refreshes the checkmark every frame, not just on tab switch
+			DisplayOptionName(); // (specter) keeps tab/panel state in sync every frame, not just on switch
 		}
 
 		/// <summary>
@@ -237,6 +264,12 @@ namespace Dodad.XSplitscreen.Components
 			{
 				OptionConfigurator configurator = (OptionConfigurator) new GameObject(type.Name).AddComponent(type);
 				configurator.gameObject.AddComponent<RectTransform>();
+				// (specter) These are logic-only components parented onto CollapsedRow (since
+				// SlotOptions lives there) - without this, each one (5 of them) still counts as an
+				// active sibling in its HorizontalLayoutGroup, adding a 10px spacing gap apiece with
+				// zero visual width to show for it. Confirmed via diagnostic: ~50px of dead space
+				// sitting after the Y-toggle glyph, dwarfing any padding/spacer tweak.
+				configurator.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
 				_configurators.Add(configurator);
 
 				// (specter) AssignmentConfigurator has its own lifecycle - it must not share OnFinished, or
@@ -368,47 +401,103 @@ namespace Dodad.XSplitscreen.Components
 
 		#region UI Methods
 
-		// (specter) Read live off SplitscreenMenuController, which samples them from a real
-		// HGButton at CreateUI() time - not cached here, since these tabs can render before that
-		// sampling runs.
+		// (specter) Read live off SplitscreenMenuController - not cached, since these tabs can
+		// render before its own HGButton color-sampling runs.
 		private static Color TabTextColor => SplitscreenMenuController.RoR2TextColor;
 		private static Color TabMutedColor => SplitscreenMenuController.RoR2MutedColor;
 		private static readonly Color Transparent = new Color(0, 0, 0, 0);
 
 		/// <summary>
-		/// (specter) Only the active tab is shown (LB/RB or Q/E still cycle Profile/Color/Trails,
-		/// they just swap which single label displays). Inactive tabs are deactivated, not just
-		/// re-colored, so the TabBar collapses to the one visible tab's width.
+		/// (specter) Assigns which tab currently holds Center/Left/Right. AnimateTabCarousel (ticked
+		/// every frame) handles the actual motion, so a role change here just animates on its own.
 		/// </summary>
 		private void DisplayOptionName()
 		{
 			var list = ActiveList;
 			if (list.Count == 0) return;
 
+			int centerIndex = _configuratorIndex;
+			int leftIndex = (centerIndex - 1 + list.Count) % list.Count;
+			int rightIndex = (centerIndex + 1) % list.Count;
+
 			for (int i = 0; i < _tabNodes.Length; i++)
 			{
-				bool isActiveTab = i == _configuratorIndex;
-				bool shouldShow = i < list.Count && isActiveTab;
-				_tabNodes[i].gameObject.SetActive(shouldShow);
-				if (!shouldShow) continue;
+				bool inRange = i < list.Count;
+				_tabNodes[i].gameObject.SetActive(inRange);
+				if (!inRange) continue;
 
 				var configurator = list[i];
 				bool canOpen = configurator.CanOpen();
+				bool isCenter = i == centerIndex;
 
 				var label = _tabNodes[i].Find("LabelRow/Label").GetComponent<TextMeshProUGUI>();
 				var check = _tabNodes[i].Find("LabelRow/Check").gameObject;
 				var underline = _tabNodes[i].Find("Underline").GetComponent<Image>();
 
 				label.text = ResolveToken(configurator.GetName());
-				label.color = !canOpen ? TabMutedColor : TabTextColor;
 				check.SetActive(false); // (specter) tab checkmark deemed unneeded, always hidden
-				underline.color = Color.white;
+				label.color = isCenter
+					? (!canOpen ? TabMutedColor : TabTextColor)
+					: new Color(TabMutedColor.r, TabMutedColor.g, TabMutedColor.b, CarouselSideAlpha);
+				underline.color = isCenter ? Color.white : Transparent;
+
+				_tabRoles[i] = isCenter ? TabRole.Center : i == leftIndex ? TabRole.Left : TabRole.Right;
+				// (specter) Center tab draws on top of the side tabs as they pass behind it mid-rotation.
+				if (isCenter)
+					_tabNodes[i].SetAsLastSibling();
 			}
 
 			var active = list[_configuratorIndex];
 			foreach (var pair in _contentPanels)
 				pair.Value.gameObject.SetActive(IsExpanded && pair.Key == active.GetType());
 		}
+
+		/// <summary>
+		/// (specter) Eases each tab's position/scale/alpha toward its current role's target every
+		/// frame, so it keeps smoothing even across multiple quick LB/RB presses.
+		/// </summary>
+		private void AnimateTabCarousel()
+		{
+			if (_tabRoles == null) return;
+			float t = Mathf.Clamp01(Time.unscaledDeltaTime * 10f);
+
+			for (int i = 0; i < _tabNodes.Length; i++)
+			{
+				if (!_tabNodes[i].gameObject.activeSelf) continue;
+
+				var rect = (RectTransform) _tabNodes[i];
+				Vector2 targetPos = TargetPosForRole(_tabRoles[i]);
+				float targetScale = TargetScaleForRole(_tabRoles[i]);
+				float targetAlpha = TargetAlphaForRole(_tabRoles[i]);
+
+				rect.anchoredPosition = Vector2.Lerp(rect.anchoredPosition, targetPos, t);
+				rect.localScale = Vector3.one * Mathf.Lerp(rect.localScale.x, targetScale, t);
+				_tabCanvasGroups[i].alpha = Mathf.Lerp(_tabCanvasGroups[i].alpha, targetAlpha, t);
+			}
+		}
+
+		/// <summary>
+		/// (specter) Snaps a tab directly to its current role with no easing - used once at setup so
+		/// tabs don't visibly animate in from a default (0,0,1,1) state before the first real switch.
+		/// </summary>
+		private void SnapTabToRole(int i)
+		{
+			var rect = (RectTransform) _tabNodes[i];
+			rect.anchoredPosition = TargetPosForRole(_tabRoles[i]);
+			rect.localScale = Vector3.one * TargetScaleForRole(_tabRoles[i]);
+			_tabCanvasGroups[i].alpha = TargetAlphaForRole(_tabRoles[i]);
+		}
+
+		private static Vector2 TargetPosForRole(TabRole role) => role switch
+		{
+			TabRole.Center => Vector2.zero,
+			TabRole.Left => new Vector2(-CarouselSideOffset, 0f),
+			_ => new Vector2(CarouselSideOffset, 0f),
+		};
+
+		private static float TargetScaleForRole(TabRole role) => role == TabRole.Center ? 1f : CarouselSideScale;
+
+		private static float TargetAlphaForRole(TabRole role) => role == TabRole.Center ? 1f : CarouselSideAlpha;
 
 		/// <summary>
 		/// (specter) Resolves a RoR2 localization token to its display string, or returns it as-is.
