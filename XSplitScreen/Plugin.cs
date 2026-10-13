@@ -208,7 +208,8 @@ namespace Dodad.XSplitscreen
 				{ "XSS_SELECT_SCREEN", "Select Screen" },
 				{ "XSS_READY", "Ready" },
 				{ "XSS_ONLINE", "Online" },
-				{ "XSS_WARN", "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session." },
+				{ "XSS_WARN", "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session. <br><br>If you don't have a separate profile for every player, create them from the main menu BEFORE setting up splitscreen - claiming a screen without one can leave a corrupted profile behind." },
+				{ "XSS_NEED_PROFILE", "Create a profile from the main menu first" },
 				{ "XSS_CREDITS", "Credits" },
 				{ "XSS_CREDITS_HOVER", "Enable or disable credits" },
 				{ "XSS_SELECT_MONITOR", "Select Monitor" },
@@ -230,7 +231,8 @@ namespace Dodad.XSplitscreen
 				{ "XSS_SELECT_SCREEN", "Select Screen" },
 				{ "XSS_READY", "Ready" },
 				{ "XSS_ONLINE", "Online" },
-				{ "XSS_WARN", "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session." },
+				{ "XSS_WARN", "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session. <br><br>If you don't have a separate profile for every player, create them from the main menu BEFORE setting up splitscreen - claiming a screen without one can leave a corrupted profile behind." },
+				{ "XSS_NEED_PROFILE", "Create a profile from the main menu first" },
 				{ "XSS_CREDITS", "Credits" },
 				{ "XSS_CREDITS_HOVER", "Enable or disable credits" },
 				{ "XSS_SELECT_MONITOR", "Select Monitor" },
@@ -252,7 +254,8 @@ namespace Dodad.XSplitscreen
 				{ "XSS_SELECT_SCREEN", "Select Screen" },
 				{ "XSS_READY", "Ready" },
 				{ "XSS_ONLINE", "Online" },
-				{ "XSS_WARN", "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session." },
+				{ "XSS_WARN", "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session. <br><br>If you don't have a separate profile for every player, create them from the main menu BEFORE setting up splitscreen - claiming a screen without one can leave a corrupted profile behind." },
+				{ "XSS_NEED_PROFILE", "Create a profile from the main menu first" },
 				{ "XSS_CREDITS", "Credits" },
 				{ "XSS_CREDITS_HOVER", "Enable or disable credits" },
 				{ "XSS_SELECT_MONITOR", "Select Monitor" },
@@ -489,6 +492,14 @@ namespace Dodad.XSplitscreen
 			var rcmFinalizer = typeof(Plugin).GetMethod("RunCameraManager_Update_Finalizer", BindingFlags.Static | BindingFlags.NonPublic);
 
 			Patcher.Patch(rcmOriginal, finalizer: new HarmonyLib.HarmonyMethod(rcmFinalizer));
+
+			// (specter) Shrink the Difficulty/Expansions/Artifacts/Karma rule grids (sidebar +
+			// popout) to fit a splitscreen viewport - vanilla sizes them for a full window and
+			// never accounts for row count vs available height, see RuleCategoryController_SetupGridVoteDisplay.
+			var rccOriginal = typeof(RoR2.UI.RuleCategoryController).GetMethod("SetupGridVoteDisplay", BindingFlags.Instance | BindingFlags.NonPublic);
+			var rccPatch = typeof(Plugin).GetMethod("RuleCategoryController_SetupGridVoteDisplay", BindingFlags.Static | BindingFlags.NonPublic);
+
+			Patcher.Patch(rccOriginal, postfix: new HarmonyLib.HarmonyMethod(rccPatch));
 		}
 
 		//-----------------------------------------------------------------------------------------------------------
@@ -814,6 +825,77 @@ namespace Dodad.XSplitscreen
 					Destroy(__instance.gameObject);
 				}
 			}));
+		}
+
+		private static readonly FieldInfo RuleCategoryPopoutInstanceField =
+			typeof(RoR2.UI.RuleCategoryController).GetField("popoutPanelInstance", BindingFlags.Instance | BindingFlags.NonPublic);
+
+		/// <summary>
+		/// (specter) Vanilla sizes the Difficulty/Expansions/Artifacts/Karma rule grids (the
+		/// sidebar strip and its popout edit panel) off a baked prefab RectTransform and never
+		/// checks content size against available viewport - RuleCategoryController.SetupGridVoteDisplayPopout
+		/// only trims columns by a couple to balance the last row, nothing more, and the popout's
+		/// own backing frame (HGPopoutPanel) has no resize logic at all. Shrinking just the grid's
+		/// cell size (an earlier attempt) left the oversized outer panel frame itself still
+		/// overflowing a quarter-viewport. Uniformly scale the whole popout (background, title,
+		/// description, grid together) and the sidebar grid down to fit this player's actual
+		/// viewport instead.
+		/// </summary>
+		private static void RuleCategoryController_SetupGridVoteDisplay(RoR2.UI.RuleCategoryController __instance)
+		{
+			if (!SplitscreenUserManager.IsSplitscreenEnabled)
+				return;
+
+			var locator = __instance.GetComponent<MPEventSystemLocator>();
+			var profile = locator?.eventSystem?.localUser?.userProfile;
+
+			if (profile?.fileName == null)
+				return;
+
+			Rect? cameraRect = null;
+
+			foreach (var user in SplitscreenUserManager.LocalUsers)
+			{
+				if (user.Profile?.fileName == profile.fileName)
+				{
+					cameraRect = user.CameraRect;
+					break;
+				}
+			}
+
+			if (cameraRect == null)
+				return;
+
+			float viewportWidth = cameraRect.Value.width * Screen.width;
+			float viewportHeight = cameraRect.Value.height * Screen.height;
+
+			// (specter) Starting guesses - the sidebar grid only gets a fraction of the accordion's
+			// height (shared with Difficulty/Expansions/Artifacts/Karma headers), the popout is a
+			// full floating dialog so it can use most of the viewport. Tune against testing feedback.
+			ScaleToFitViewport(__instance.voteResultGridContainer, viewportWidth * 0.9f, viewportHeight * 0.22f);
+
+			var popoutPanelInstance = RuleCategoryPopoutInstanceField?.GetValue(__instance) as HGPopoutPanel;
+			ScaleToFitViewport(popoutPanelInstance?.transform as RectTransform, viewportWidth * 0.95f, viewportHeight * 0.9f);
+		}
+
+		private static void ScaleToFitViewport(RectTransform target, float maxWidth, float maxHeight)
+		{
+			if (target == null)
+				return;
+
+			float width = target.rect.width;
+			float height = target.rect.height;
+
+			if (width <= 0 || height <= 0)
+				return;
+
+			// floor so content doesn't shrink past legibility - accept overflow past this rather
+			// than shrink further
+			const float minScale = 0.5f;
+
+			float scale = Mathf.Max(minScale, Mathf.Min(1f, Mathf.Min(maxWidth / width, maxHeight / height)));
+
+			target.localScale = Vector3.one * scale;
 		}
 
 		private static MethodInfo _mpEventSystemBaseUpdate;

@@ -210,8 +210,10 @@ namespace Dodad.XSplitscreen.Components
 				notificationGroup.alpha = Mathf.MoveTowards(notificationGroup.alpha, groupAlphaTarget, Time.unscaledDeltaTime * 10f);
 			else
 			{
+				// (specter) Was Destroy() - see the same note in CreateUI. Hide instead, so it can
+				// be reactivated on the next OnEnter.
 				if(notificationGroup.alpha < 1)
-					Destroy(notificationGroup.gameObject);
+					notificationGroup.gameObject.SetActive(false);
 			}
 		}
 
@@ -316,6 +318,20 @@ namespace Dodad.XSplitscreen.Components
 
 			if (!hasInitialized)
 				CreateUI();
+			else if (monitorId == 0)
+			{
+				// (specter) ShowBackupWarning/BackupWarningTimer only ever get their static-field
+				// defaults once per game process - without a reset here, the warning only showed on
+				// the very first splitscreen menu visit ever, never again after being dismissed.
+				ShowBackupWarning = true;
+				BackupWarningTimer = 20f;
+				LocalUserPanel.AllowChanges = false;
+				if (notificationGroup != null)
+				{
+					notificationGroup.alpha = 1f;
+					notificationGroup.gameObject.SetActive(true);
+				}
+			}
 
 			if (monitorId != 0)
 			{
@@ -687,7 +703,17 @@ namespace Dodad.XSplitscreen.Components
 			if (ShowBackupWarning)
 			{
 				var warningText = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
-				warningText.GetComponentInChildren<LanguageTextMeshController>().token = "XSS_WARN";
+				// (specter) Token-driven text is stale-cache-prone (see the swap-legend comment
+				// above, same root cause: Plugin.LoadLanguage's language.json merge always lets an
+				// existing on-disk file win over new code defaults) - hardcoded directly so an
+				// updated warning actually reaches returning players, not just fresh installs.
+				// (specter) Resolve the TMP component independently rather than through the
+				// controller's own textMeshPro field - that field is populated in the controller's
+				// OnEnable, and disabling it immediately (below) left it null, NREing on access.
+				var warningTmp = warningText.GetComponentInChildren<TMPro.TMP_Text>();
+				var warningController = warningText.GetComponentInChildren<LanguageTextMeshController>();
+				warningController.enabled = false;
+				warningTmp.text = "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session. <br><br>If you don't have a separate profile for every player, create them from the main menu BEFORE setting up splitscreen - claiming a screen without one can leave a corrupted profile behind.";
 				var warnLayout = warningText.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
 				var warnRect = warningText.gameObject.GetComponent<RectTransform>();
 				warnRect.anchorMax = new Vector2(0.8f, 1f);
@@ -706,7 +732,10 @@ namespace Dodad.XSplitscreen.Components
 			}
 			else
 			{
-				Destroy(notificationGroup.gameObject);
+				// (specter) Was Destroy() - notificationGroup is the one baked "Notification Panel",
+				// not a clone, so destroying it meant the warning could never show again for the
+				// rest of the session. Hide it instead so OnEnter can bring it back on re-entry.
+				notificationGroup.gameObject.SetActive(false);
 			}
 
 			// Credits

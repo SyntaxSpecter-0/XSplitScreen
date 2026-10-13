@@ -359,6 +359,18 @@ namespace Dodad.XSplitscreen.Components
 					return;
 				}
 
+				// (specter) A null profile here means there wasn't one left to pick (e.g. only one
+				// real profile for 2+ players) - letting this through hands the slot to RoR2's own
+				// Guest-profile fallback at launch, which isn't built to survive being saved as if
+				// permanent and can come back as a corrupted profile on next load. Block the claim
+				// instead of silently proceeding.
+				if (Options.Slot.Profile == null)
+				{
+					_claim = null;
+					Options.SetMessage("XSS_NEED_PROFILE", Color.red);
+					return;
+				}
+
 				_claim.Claim(this);
 
 				if (_showCursor)

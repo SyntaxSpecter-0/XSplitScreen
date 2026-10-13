@@ -87,16 +87,17 @@ namespace Dodad.XSplitscreen.Components
 				var currentPlayer = playerList[e];
 				var slot = FindSlotByPlayer(currentPlayer);
 
-				var controller = currentPlayer.controllers.GetLastActiveController();
-
-				if (LocalUserSlot.GetDeviceKeyFromController(controller) == "keyboard")
-					continue;
-
 				if (currentPlayer.name == "PlayerMain")
 				{
 					if (slot != null)
 						continue;
 
+					// (specter) Before a controller is claimed into a slot, Rewired still has it
+					// attached to PlayerMain alongside keyboard+mouse, so any of them pressing join
+					// fires through here - TryAddPlayerToSlot grabs the actual triggering device
+					// below, not "PlayerMain" itself, so there's no hijack to guard against. An
+					// earlier device-key filter here blocked every non-keyboard device from ever
+					// joining - removed.
 					if (currentPlayer.GetButtonDown(11))
 						TryAddPlayerToSlot(currentPlayer);
 				}
