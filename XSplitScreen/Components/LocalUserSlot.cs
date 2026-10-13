@@ -252,7 +252,7 @@ namespace Dodad.XSplitscreen.Components
 
 		private void SetupOptionsUI()
 		{
-			// (specter) Lives on CollapsedRow, not ExpandedContent, so it keeps running while
+			// (specter) Lives on CollapsedRow instead of ExpandedContent, so it keeps running while
 			// collapsed - it's what detects the Y press that opens the panel.
 			_options = transform.Find("CollapsedRow").gameObject.AddComponent<SlotOptions>();
 		}
@@ -282,8 +282,8 @@ namespace Dodad.XSplitscreen.Components
 			if (collapsedHorizontal != null)
 			{
 				collapsedHorizontal.spacing = 10;
-				// (specter) Baked 10px right padding was leaving a visible gap between the glyph and
-				// the row's true edge - tightened just the right side so it sits flush, per feedback.
+				// (specter) Baked 10px right padding left a visible gap between the glyph and the
+				// row's true edge - tightened just the right side so it sits flush.
 				var padding = collapsedHorizontal.padding;
 				padding.right = 8;
 				collapsedHorizontal.padding = padding;
@@ -409,8 +409,8 @@ namespace Dodad.XSplitscreen.Components
 			SetGlyphBoxSize(_rbLabel, 28);
 			SetupShoulderChevron(rbButtonNode.Find("Chevron").GetComponent<TextMeshProUGUI>());
 
-			// (specter) Divider between the tab name and its value, not the baked "Separator" (that's
-			// header-vs-panel). Inserted once, right after TabBar.
+			// (specter) Divider between the tab name and its value, distinct from the baked
+			// "Separator" (that's header-vs-panel). Inserted once, right after TabBar.
 			var tabBarNode = _expandedContent.Find("TabBar");
 			var valueSeparator = new GameObject("ValueSeparator", typeof(RectTransform));
 			valueSeparator.transform.SetParent(_expandedContent, false);
@@ -458,7 +458,7 @@ namespace Dodad.XSplitscreen.Components
 			}
 
 			// (specter) ColorContent's own hue-bar arrows were still the baked muted grey - every
-			// non-background glyph should be white per feedback.
+			// non-background glyph should be white.
 			var colorContent = _expandedContent.Find("ColorContent");
 			colorContent.Find("HueRow/LeftArrow").GetComponent<TextMeshProUGUI>().color = SplitscreenMenuController.RoR2TextColor;
 			colorContent.Find("HueRow/RightArrow").GetComponent<TextMeshProUGUI>().color = SplitscreenMenuController.RoR2TextColor;
@@ -518,8 +518,8 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		// (specter) Baked prefab puts Chevron above Label in the VerticalLayoutGroup - moved below
-		// and sized up a touch so the direction arrow reads as "this does something", not just a
-		// decoration floating over the L1/R1 letters.
+		// and sized up a touch so the direction arrow reads as functional, instead of a decoration
+		// floating over the L1/R1 letters.
 		private static void SetupShoulderChevron(TextMeshProUGUI chevron)
 		{
 			chevron.transform.SetAsLastSibling();
@@ -530,19 +530,25 @@ namespace Dodad.XSplitscreen.Components
 		/// <summary>
 		/// (specter) (asset, confirm sprite, north sprite, LB/L1 sprite, RB/R1 sprite, D-pad up
 		/// sprite, D-pad down sprite) per gamepad family, matching RoR2.Glyphs' own registration
-		/// calls. Can't use RoR2.Glyphs.GetGlyphString here - it resolves through Rewired's
-		/// per-player action bindings, which our slot players don't have, so it always falls back
-		/// to blank/unbound. This builds the same sprite tags directly instead.
-		/// Xbox/PS4 confirmed by exporting the real atlas and checking visually. PS5 reuses the
-		/// PS4 sheet - visually identical face buttons/D-pad, no separate PS5 atlas needed.
+		/// calls. RoR2.Glyphs.GetGlyphString resolves through Rewired's per-player action bindings,
+		/// which our slot players don't have, so it always falls back to blank/unbound; this builds
+		/// the same sprite tags directly instead. PS5 reuses the PS4 sheet, since its face
+		/// buttons/D-pad are visually identical.
 		/// </summary>
-		// (specter) internal, not private - SplitscreenMenuController reuses xbox/ps4 LB/RB tags
-		// verbatim for the static "swap monitors" legend.
+		// (specter) internal instead of private, since SplitscreenMenuController reuses xbox/ps4
+		// LB/RB tags verbatim for the static "swap monitors" legend.
 		internal static readonly Dictionary<string, (string asset, string confirm, string north, string lb, string rb, string up, string down)> GamepadGlyphs = new()
 		{
 			["xbox"] = ("tmpsprXboxOneGlyphs", "texXBoxOneGlyphs_0", "texXBoxOneGlyphs_11", "texXBoxOneGlyphs_2", "texXBoxOneGlyphs_6", "texXBoxOneGlyphs_14", "texXBoxOneGlyphs_15"),
 			["ps4"] = ("tmpsprPS4GlyphsUnified", "texPS4GlyphsUnified_0", "texPS4GlyphsUnified_1", "texPS4GlyphsUnified_4", "texPS4GlyphsUnified_5", "texPS4GlyphsUnified_21", "texPS4GlyphsUnified_22"),
 			["ps5"] = ("tmpsprPS4GlyphsUnified", "texPS4GlyphsUnified_0", "texPS4GlyphsUnified_1", "texPS4GlyphsUnified_4", "texPS4GlyphsUnified_5", "texPS4GlyphsUnified_21", "texPS4GlyphsUnified_22"),
+			// (specter) RoR2's own tmpsprSwitchGlyphsUnified atlas, same asset RoR2.Glyphs.
+			// RegisterSwitchController uses. confirm/north/lb/rb derived from RoR2's element-index
+			// table (indices 6/9/10/11 - consistent across its Xbox and PS4 registrations too).
+			// up/down are a best guess - that index shifts between Xbox and PS4 in RoR2's own
+			// table, so Switch's isn't derivable with confidence from static analysis; verify
+			// visually with a real Switch controller and correct if the d-pad glyphs look wrong.
+			["switch"] = ("tmpsprSwitchGlyphsUnified", "texSwitchGlyphsUnified_3", "texSwitchGlyphsUnified_5", "texSwitchGlyphsUnified_6", "texSwitchGlyphsUnified_7", "texSwitchGlyphsUnified_74", "texSwitchGlyphsUnified_12"),
 		};
 
 		/// <summary>
@@ -607,8 +613,8 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		/// <summary>
-		/// (specter) Applies RoR2's real font (not its material - the shadow/underlay reads as a
-		/// gray haze at this size) and real button/text colors, matching the game's own panels.
+		/// (specter) Applies RoR2's real font, skipping its material since the shadow/underlay reads
+		/// as a gray haze at this size, and real button/text colors, matching the game's own panels.
 		/// </summary>
 		private void ApplyRoR2Theme()
 		{
@@ -814,8 +820,8 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void HandleEmptySlot()
 		{
-			// (specter) Compare by panel, not direct parent - slots now live in one of 2 columns
-			// (LocalUserPanel.CreateColumn), so a parent check would only see one column's slots.
+			// (specter) Compares by panel instead of direct parent, since slots now live in one of 2
+			// columns (LocalUserPanel.CreateColumn) and a parent check would only see one column's slots.
 			var siblings = Instances.Where(x => x._panel == _panel);
 			int instanceCount = siblings.Count();
 
@@ -976,6 +982,9 @@ namespace Dodad.XSplitscreen.Components
 				if (guid == RoR2.DefaultControllerMaps.xboneControllerGuid) return "xbox";
 				if (guid == RoR2.DefaultControllerMaps.PS4Guid) return "ps4";
 				if (guid == RoR2.DefaultControllerMaps.PS5Guid) return "ps5";
+				if (guid == RoR2.DefaultControllerMaps.switchProGuid
+					|| guid == RoR2.DefaultControllerMaps.switchDualGuid
+					|| guid == RoR2.DefaultControllerMaps.switchHandheldGuid) return "switch";
 			}
 
 			// (specter) `name` is often a generic driver label - also check `hardwareName`, and log
@@ -1001,6 +1010,10 @@ namespace Dodad.XSplitscreen.Components
 
 			if (Has(name, "360") || Has(hardwareName, "360"))
 				return "xbox360";
+
+			if (Has(name, "nintendo") || Has(hardwareName, "nintendo") || Has(name, "switch") || Has(hardwareName, "switch")
+				|| Has(name, "pro controller") || Has(hardwareName, "pro controller"))
+				return "switch";
 
 			return "xbox";
 		}
@@ -1178,7 +1191,7 @@ namespace Dodad.XSplitscreen.Components
 				float navHorizontal = useStick ? LeftRightDelta : dpadHorizontal;
 				float navVertical = useStick ? UpDownDelta : dpadVertical;
 
-				// (specter) Use navHorizontal, not the raw stick - keeps ColorConfigurator's
+				// (specter) Uses navHorizontal instead of the raw stick, to keep ColorConfigurator's
 				// hue-scrub on the d-pad while a panel is open, same as Left/Right below.
 				LeftHeld = navHorizontal < -0.3f;
 				RightHeld = navHorizontal > 0.3f;

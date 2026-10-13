@@ -154,12 +154,12 @@ namespace Dodad.XSplitscreen
 		}
 
 		/// <summary>
-		/// (specter) Waits for RoR2Application.IsAllUsersEntitlementsUpdated before transitioning -
-		/// vanilla's RunCameraManager.Update indexes its camera dictionary with no existence check,
-		/// and a non-host camera isn't created until entitlements resolve. Doesn't fully close the
-		/// gap on its own (CharacterSelectController re-triggers the same check on scene entry, see
-		/// Plugin.RunCameraManager_Update_Finalizer for the actual safety net), but shrinks how
-		/// often that fallback fires. Falls back to transitioning after ~2s regardless.
+		/// (specter) Waits for RoR2Application.IsAllUsersEntitlementsUpdated before transitioning,
+		/// since vanilla's RunCameraManager.Update indexes its camera dictionary with no existence
+		/// check and a non-host camera isn't created until entitlements resolve. This only reduces
+		/// how often that gap is hit - CharacterSelectController re-triggers the same check on scene
+		/// entry, where Plugin.RunCameraManager_Update_Finalizer is the actual safety net. Transitions
+		/// regardless after ~2s as a fallback.
 		/// </summary>
 		private static void WaitForEntitlementsThenTransition(string gamemode, int retriesLeft)
 		{

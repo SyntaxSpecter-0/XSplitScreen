@@ -69,25 +69,6 @@ namespace Dodad.XSplitscreen
                 Log.Print("Loaded language");
 
             SetSubscriptions(true);
-
-			/*Log.Init(Logger);
-
-            var assembly = Assembly.GetExecutingAssembly();
-            string bundleKey;
-
-            if (XLibrary.Resources.RegisterBundle(assembly, this, $"DoDad.XSplitScreen.{PluginBundle}", out bundleKey))
-            {
-                Log.LogOutput($"Initializing", Log.LogLevel.Debug);
-                XLibrary.Plugin.InitializePlugin(assembly, this, new XLibrary.Language.TokenConfiguration(PluginTag));
-                Initialize();
-                SceneManager.activeSceneChanged += ActiveSceneChanged;
-                Plugin.bundleKey = bundleKey;
-            }
-            else
-            {
-                Log.LogOutput($"Unable to register asset bundle. Plugin disabled.", Log.LogLevel.Warning);
-                return;
-            }*/
 		}
 
 		public void OnApplicationQuit()
@@ -500,6 +481,18 @@ namespace Dodad.XSplitscreen
 			var rccPatch = typeof(Plugin).GetMethod("RuleCategoryController_SetupGridVoteDisplay", BindingFlags.Static | BindingFlags.NonPublic);
 
 			Patcher.Patch(rccOriginal, postfix: new HarmonyLib.HarmonyMethod(rccPatch));
+
+			// (specter) Same fix for the crafting panel - see CraftingPanel_Awake. Resolved by name
+			// instead of typeof(RoR2.UI.CraftingPanel), since that type isn't in the GameLibs stub
+			// this project compiles against - only in the actual game assembly loaded at runtime.
+			var craftingPanelType = Type.GetType("RoR2.UI.CraftingPanel, RoR2");
+			var cpOriginal = craftingPanelType?.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic);
+
+			if (cpOriginal != null)
+			{
+				var cpPatch = typeof(Plugin).GetMethod("CraftingPanel_Awake", BindingFlags.Static | BindingFlags.NonPublic);
+				Patcher.Patch(cpOriginal, postfix: new HarmonyLib.HarmonyMethod(cpPatch));
+			}
 		}
 
 		//-----------------------------------------------------------------------------------------------------------
@@ -532,6 +525,7 @@ namespace Dodad.XSplitscreen
             titleButtonLanguage.token = "XSS_NAME";
 
             var titleButton = titleObject.GetComponent<HGButton>();
+            MainMenuTitleButton = titleButton;
             titleButton.hoverToken = "XSS_NAME_HOVER";
             titleButton.requiredTopLayer = MainMenuController.instance.singlePlayerButton.requiredTopLayer;
             titleButton.hoverLanguageTextMeshController = MainMenuController.instance.singlePlayerButton.hoverLanguageTextMeshController;
@@ -570,8 +564,8 @@ namespace Dodad.XSplitscreen
 
                 var menuController = menu.transform.Find("Splitscreen Menu");
 
-				// (specter) Scoped to Main Panel, not the whole canvas - Notification/Credits Panel
-				// rely on seeing through to whatever's behind the canvas at their edges.
+				// (specter) Scoped to Main Panel instead of the whole canvas, since Notification/Credits
+				// Panel rely on seeing through to whatever's behind the canvas at their edges.
 				SetupAmbientBackground(menuController.Find("Main Panel"));
 
 				var canvas = menuController.gameObject.GetComponent<Canvas>();
@@ -629,13 +623,6 @@ namespace Dodad.XSplitscreen
 
 		//-----------------------------------------------------------------------------------------------------------
 
-		#region Public Methods
-		/*internal static void RecreateAssignmentScreen()
-        {
-            Destroy(assignmentScreen);
-            CreateInitializationRoutine();
-        }*/
-		#endregion
 
 		//-----------------------------------------------------------------------------------------------------------
 
@@ -645,8 +632,8 @@ namespace Dodad.XSplitscreen
         /// </summary>
 		private static void OnMainMenuInitialized()
         {
-			// (specter) Also fires after quitting an active run, not just backing out of the menu
-			// screen - without this a controller stays reassigned to a non-"PlayerMain" Rewired
+			// (specter) Also fires after quitting an active run, in addition to backing out of the
+			// menu screen; without this a controller stays reassigned to a non-"PlayerMain" Rewired
 			// player and can't navigate the main menu.
 			if (SplitscreenUserManager.IsSplitscreenEnabled)
 				SplitscreenUserManager.DisableSplitscreen();
@@ -658,35 +645,10 @@ namespace Dodad.XSplitscreen
 
             CreateTitleUI();
 		}
-		/*public static void ActiveSceneChanged(Scene previous, Scene current)
-        {
-            if (current.name.Equals("title"))
-                CreateInitializationRoutine();
-        }*/
 		#endregion
 
 		//-----------------------------------------------------------------------------------------------------------
 
-		#region Coroutines
-		/*internal static IEnumerator WaitToInitializeUI()
-        {
-            while (!XLibrary.Plugin.uiPrefabsReady)
-                yield return null;
-
-            Log.LogOutput($"Initializing UI", Log.LogLevel.Message);
-
-            while (!InitializeTitleButton())
-                yield return null;
-
-            while (!InitializeUI())
-                yield return null;
-
-            //Log.LogOutput($"WaitToInitializeUI complete");
-            initializationCoroutine = null;
-
-            yield return null;
-        }*/
-		#endregion
 
 		//-----------------------------------------------------------------------------------------------------------
 
@@ -736,10 +698,10 @@ namespace Dodad.XSplitscreen
 
 		/// <summary>
 		/// (specter) Vanilla's RunCameraManager.Update indexes its camera dictionary by player
-		/// name with no existence check, assuming every local player already has a camera - not
-		/// true until entitlements resolve, and that check gets re-triggered (and the race
-		/// reopened) more than once per session. Rather than chase every trigger, swallow the
-		/// resulting KeyNotFoundException here and let it retry next frame; anything else rethrows.
+		/// name with no existence check, assuming every local player already has a camera. That's
+		/// only true once entitlements resolve, and the check gets re-triggered - reopening the
+		/// race - more than once per session. Rather than chase every trigger, this swallows the
+		/// resulting KeyNotFoundException here and retries next frame; anything else rethrows.
 		/// </summary>
 		private static Exception RunCameraManager_Update_Finalizer(Exception __exception)
 		{
@@ -800,8 +762,6 @@ namespace Dodad.XSplitscreen
 			instance.userName = instance.GetNetworkPlayerName().GetResolvedName();
 		}
 
-		private static readonly FieldInfo ProfileNameLabelTokenField = typeof(RoR2.UI.ProfileNameLabel).GetField("token", BindingFlags.Instance | BindingFlags.NonPublic);
-
 		private static void ProfileNameLabel_LateUpdate(RoR2.UI.ProfileNameLabel __instance)
 		{
 			var locator = __instance.GetComponent<MPEventSystemLocator>();
@@ -811,7 +771,7 @@ namespace Dodad.XSplitscreen
 				return;
 
 			var label = __instance.GetComponent<TMPro.TextMeshProUGUI>();
-			var token = (string)ProfileNameLabelTokenField.GetValue(__instance);
+			var token = __instance.token;
 
 			label.text = RoR2.Language.GetStringFormatted(token, localUser.userProfile.name);
 		}
@@ -830,52 +790,63 @@ namespace Dodad.XSplitscreen
 		private static readonly FieldInfo RuleCategoryPopoutInstanceField =
 			typeof(RoR2.UI.RuleCategoryController).GetField("popoutPanelInstance", BindingFlags.Instance | BindingFlags.NonPublic);
 
-		/// <summary>
-		/// (specter) Vanilla sizes the Difficulty/Expansions/Artifacts/Karma rule grids (the
-		/// sidebar strip and its popout edit panel) off a baked prefab RectTransform and never
-		/// checks content size against available viewport - RuleCategoryController.SetupGridVoteDisplayPopout
-		/// only trims columns by a couple to balance the last row, nothing more, and the popout's
-		/// own backing frame (HGPopoutPanel) has no resize logic at all. Shrinking just the grid's
-		/// cell size (an earlier attempt) left the oversized outer panel frame itself still
-		/// overflowing a quarter-viewport. Uniformly scale the whole popout (background, title,
-		/// description, grid together) and the sidebar grid down to fit this player's actual
-		/// viewport instead.
-		/// </summary>
-		private static void RuleCategoryController_SetupGridVoteDisplay(RoR2.UI.RuleCategoryController __instance)
-		{
-			if (!SplitscreenUserManager.IsSplitscreenEnabled)
-				return;
+		// (specter) Several per-player RoR2 UI panels (the Difficulty/Expansions/Artifacts/Karma
+		// rule grids, the crafting panel) are sized for a full window with no viewport check at
+		// all - scale them down as whole units to fit this player's actual splitscreen viewport.
+		private const float SidebarGridWidthFrac = 0.9f;
+		private const float SidebarGridHeightFrac = 0.22f;
+		private const float FloatingPanelWidthFrac = 0.95f;
+		private const float FloatingPanelHeightFrac = 0.9f;
 
-			var locator = __instance.GetComponent<MPEventSystemLocator>();
+		private static bool TryGetLocalPlayerViewport(Component component, out float viewportWidth, out float viewportHeight)
+		{
+			viewportWidth = 0f;
+			viewportHeight = 0f;
+
+			if (!SplitscreenUserManager.IsSplitscreenEnabled)
+				return false;
+
+			var locator = component.GetComponent<MPEventSystemLocator>();
 			var profile = locator?.eventSystem?.localUser?.userProfile;
 
 			if (profile?.fileName == null)
-				return;
-
-			Rect? cameraRect = null;
+				return false;
 
 			foreach (var user in SplitscreenUserManager.LocalUsers)
 			{
 				if (user.Profile?.fileName == profile.fileName)
 				{
-					cameraRect = user.CameraRect;
-					break;
+					viewportWidth = user.CameraRect.width * Screen.width;
+					viewportHeight = user.CameraRect.height * Screen.height;
+					return true;
 				}
 			}
 
-			if (cameraRect == null)
+			return false;
+		}
+
+		private static void RuleCategoryController_SetupGridVoteDisplay(RoR2.UI.RuleCategoryController __instance)
+		{
+			if (!TryGetLocalPlayerViewport(__instance, out float viewportWidth, out float viewportHeight))
 				return;
 
-			float viewportWidth = cameraRect.Value.width * Screen.width;
-			float viewportHeight = cameraRect.Value.height * Screen.height;
-
-			// (specter) Starting guesses - the sidebar grid only gets a fraction of the accordion's
-			// height (shared with Difficulty/Expansions/Artifacts/Karma headers), the popout is a
-			// full floating dialog so it can use most of the viewport. Tune against testing feedback.
-			ScaleToFitViewport(__instance.voteResultGridContainer, viewportWidth * 0.9f, viewportHeight * 0.22f);
+			ScaleToFitViewport(__instance.voteResultGridContainer, viewportWidth * SidebarGridWidthFrac, viewportHeight * SidebarGridHeightFrac);
 
 			var popoutPanelInstance = RuleCategoryPopoutInstanceField?.GetValue(__instance) as HGPopoutPanel;
-			ScaleToFitViewport(popoutPanelInstance?.transform as RectTransform, viewportWidth * 0.95f, viewportHeight * 0.9f);
+			ScaleToFitViewport(popoutPanelInstance?.transform as RectTransform, viewportWidth * FloatingPanelWidthFrac, viewportHeight * FloatingPanelHeightFrac);
+		}
+
+		// (specter) CraftingPanel.Awake sets GridLayoutGroup.constraintCount straight off
+		// slotCount with no viewport check, the same unbounded-grid shape as the rule panels above.
+		// Typed as Component instead of RoR2.UI.CraftingPanel, since that type isn't in the
+		// GameLibs stub this project compiles against - only in the live game assembly Harmony
+		// patches at runtime.
+		private static void CraftingPanel_Awake(Component __instance)
+		{
+			if (!TryGetLocalPlayerViewport(__instance, out float viewportWidth, out float viewportHeight))
+				return;
+
+			ScaleToFitViewport(__instance.transform as RectTransform, viewportWidth * FloatingPanelWidthFrac, viewportHeight * FloatingPanelHeightFrac);
 		}
 
 		private static void ScaleToFitViewport(RectTransform target, float maxWidth, float maxHeight)
@@ -889,16 +860,12 @@ namespace Dodad.XSplitscreen
 			if (width <= 0 || height <= 0)
 				return;
 
-			// floor so content doesn't shrink past legibility - accept overflow past this rather
-			// than shrink further
-			const float minScale = 0.5f;
+			const float minScale = 0.5f; // floor so content doesn't shrink past legibility
 
 			float scale = Mathf.Max(minScale, Mathf.Min(1f, Mathf.Min(maxWidth / width, maxHeight / height)));
 
 			target.localScale = Vector3.one * scale;
 		}
-
-		private static MethodInfo _mpEventSystemBaseUpdate;
 
 		private static bool MPEventSystem_Update(MPEventSystem __instance)
 		{
@@ -987,8 +954,15 @@ namespace Dodad.XSplitscreen
 		/// <param name="__instance"></param>
 		private static void RewiredClonePlayers(InputManager_Base __instance)
 		{
+			// (specter) Assumes Rewired's Input Manager starts with exactly PlayerMain/Player2/
+			// Player3 and clones from there - if that count is ever anything else (a Rewired/SDK
+			// config change), this bails with no visible error and the whole mod silently no-ops.
+			// Log loudly so that failure mode is diagnosable instead of invisible.
             if (__instance.userData.players.Count != 3)
+            {
+				Log.Print($"RewiredClonePlayers: expected exactly 3 default Rewired players, found {__instance.userData.players.Count} - skipping player cloning. Splitscreen beyond 1 player will not work.", Log.ELogChannel.Error);
                 return;
+            }
 
             var player = __instance.userData.players[2].Clone();
 
@@ -1010,9 +984,14 @@ namespace Dodad.XSplitscreen
 		/// <param name="__instance"></param>
 		private static void RoR2AppResizePlayers(RoR2.RoR2Application __instance)
 		{
-			RoR2.RoR2Application.maxPlayers = HardMaxPlayers;
-			RoR2.RoR2Application.hardMaxPlayers = HardMaxPlayers;
-			RoR2.RoR2Application.maxLocalPlayers = HardMaxPlayers;
+			// (specter) These fields are `readonly` in the live game assembly. The older GameLibs
+			// package this project compiles against doesn't mark them readonly, so there's no
+			// compile error. Reflection SetValue bypasses that restriction regardless of what the
+			// CLR enforces.
+			var appType = typeof(RoR2.RoR2Application);
+			appType.GetField("maxPlayers", BindingFlags.Static | BindingFlags.Public).SetValue(null, HardMaxPlayers);
+			appType.GetField("hardMaxPlayers", BindingFlags.Static | BindingFlags.Public).SetValue(null, HardMaxPlayers);
+			appType.GetField("maxLocalPlayers", BindingFlags.Static | BindingFlags.Public).SetValue(null, HardMaxPlayers);
 
 			Patcher.Unpatch(typeof(RoR2.RoR2Application).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic),
 				typeof(Plugin).GetMethod("RoR2AppResizePlayers", BindingFlags.Static | BindingFlags.NonPublic));

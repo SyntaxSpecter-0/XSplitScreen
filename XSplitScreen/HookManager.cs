@@ -1,5 +1,4 @@
-﻿using MonoMod.Cil;
-using Rewired;
+﻿using Rewired;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -7,10 +6,8 @@ using System.Text;
 using static Dodad.XSplitscreen.Log;
 using UnityEngine;
 using RoR2;
-using Mono.Cecil.Cil;
 using R2API.Utils;
 using RoR2.UI;
-using System.Linq;
 
 namespace Dodad.XSplitscreen
 {
@@ -44,158 +41,79 @@ namespace Dodad.XSplitscreen
 			RoR2.Networking.NetworkManagerSystem.SvMaxPlayersConVar.instance.SetString(playerCount.ToString());
 		}
 
-		private static MethodInfo RunCameraManager_Udpate_Orig;
-		private static MethodInfo RunCameraManager_Udpate_Patch;
+		private static MethodInfo RunCameraManager_Update_Orig;
+		private static MethodInfo RunCameraManager_Update_ExtraPlayers_Patch;
+
 		private static void UpdateRunCameraManager(bool isSplitscreenEnabled)
 		{
+			RunCameraManager_Update_Orig ??= typeof(RoR2.RunCameraManager).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic);
+			RunCameraManager_Update_ExtraPlayers_Patch ??= typeof(HookManager).GetMethod("RunCameraManager_Update_ExtraPlayers", BindingFlags.Static | BindingFlags.NonPublic);
+
 			if (isSplitscreenEnabled)
 			{
-				IL.RoR2.RunCameraManager.Update += RunCameraManager_Update_IL;
+				Plugin.Patcher.Patch(RunCameraManager_Update_Orig, postfix: new HarmonyLib.HarmonyMethod(RunCameraManager_Update_ExtraPlayers_Patch));
 			}
 			else
 			{
-				IL.RoR2.RunCameraManager.Update -= RunCameraManager_Update_IL;
+				Plugin.Patcher.Unpatch(RunCameraManager_Update_Orig, RunCameraManager_Update_ExtraPlayers_Patch);
 			}
 		}
 
-		public static void LogInputPlayerName(string name)
+		private static FieldInfo _runCameraManagerCamerasField;
+		private static FieldInfo _runCameraManagerCanvasesField;
+
+		// (specter) Vanilla's own character-select canvas setup only has cases for PlayerMain/
+		// Player2/Player3/Player4, so any local player beyond that (this mod clones Rewired players
+		// up to Player16) never gets a canvas. This mirrors vanilla's own instantiate+wire steps
+		// (RunCameraManager.Update) for those unmatched names, using a postfix instead of an IL
+		// patch, since an exact-instruction-sequence IL match breaks the moment vanilla's method
+		// body is rewritten, as happened with the 1.5.0 update.
+		private static void RunCameraManager_Update_ExtraPlayers(RoR2.RunCameraManager __instance)
 		{
-			/*if (name == "PlayerMain" ||
-				name == "Player2" ||
-				name == "Player3" ||
-				name == "Player4")
-				return;*/
+			if (!__instance.isLobby || !RoR2Application.isInLocalMultiPlayer)
+				return;
 
-			Log.Print($"HookManager::LogInputPlayerName: '{name}'");
-		}
+			_runCameraManagerCamerasField ??= typeof(RoR2.RunCameraManager).GetField("cameras", BindingFlags.Instance | BindingFlags.NonPublic);
+			_runCameraManagerCanvasesField ??= typeof(RoR2.RunCameraManager).GetField("canvases", BindingFlags.Instance | BindingFlags.NonPublic);
 
-		private static void RunCameraManager_Update_IL(ILContext il)
-		{
-			ILCursor c = new ILCursor(il);
+			var cameras = (Dictionary<string, CameraRigController>) _runCameraManagerCamerasField.GetValue(__instance);
+			var canvases = (Dictionary<string, Canvas>) _runCameraManagerCanvasesField.GetValue(__instance);
 
-			if (c.TryGotoNext(
-					x => x.MatchLdloc(16),
-					x => x.MatchCallvirt<RoR2.LocalUser>("get_inputPlayer"),
-					x => x.MatchCallvirt<Rewired.Player>("get_name"),
-					x => x.MatchLdstr("PlayerMain"),
-					x => x.MatchCall<string>("op_Equality")
-				))
+			var localPlayers = NetworkUser.readOnlyLocalPlayersList;
+
+			for (int i = 0; i < localPlayers.Count; i++)
 			{
-				// Store name in local 18 for fallback logic
-				c.Index += 3;
-				c.Emit(OpCodes.Dup);
-				c.Emit(OpCodes.Stloc_S, (byte) 18); // local 18 = playerName
+				var localUser = localPlayers[i]?.localUser;
 
-				// Check against PlayerMain, Player2, Player3, Player4
-				string[] names = { "PlayerMain", "Player2", "Player3", "Player4" };
-				var stringEquality = typeof(string).GetMethod("op_Equality", new[] { typeof(string), typeof(string) });
+				if (localUser?.inputPlayer == null)
+					continue;
 
-				ILLabel continueLabel = c.DefineLabel();
+				string name = localUser.inputPlayer.name;
 
-				foreach (var name in names)
-				{
-					c.Emit(OpCodes.Dup);               // [name, name]
-					c.Emit(OpCodes.Ldstr, name);       // [name, name, "PlayerN"]
-					c.Emit(OpCodes.Call, stringEquality); // [name, bool]
-					c.Emit(OpCodes.Brtrue_S, continueLabel); // If true, jump to original logic
-				}
+				if (name == "PlayerMain" || name == "Player2" || name == "Player3" || name == "Player4")
+					continue; // vanilla already handles these
 
-				// If none matched, pop the name and instantiate the fallback prefab
-				c.Emit(OpCodes.Pop);
-				c.Emit(OpCodes.Ldarg_0); // this
-				c.Emit(OpCodes.Ldfld, typeof(RoR2.RunCameraManager).GetField("CharacterSelectUILocal"));
-				c.Emit(OpCodes.Call, typeof(UnityEngine.Object).GetMethod("Instantiate", new[] { typeof(UnityEngine.GameObject) }));
-				c.Emit(OpCodes.Stloc_S, (byte) 17);
+				if (canvases.TryGetValue(name, out var existingCanvas) && existingCanvas != null)
+					continue;
 
-				// Set MPEventSystemProvider.eventSystem on the new GameObject
-				// Load gameObject (local 17)
-				c.Emit(OpCodes.Ldloc_S, (byte) 17);
-				// GetComponent<MPEventSystemProvider>()
-				var getComponentGeneric = typeof(UnityEngine.GameObject)
-					.GetMethods()
-					.First(m => m.Name == "GetComponent" && m.IsGenericMethod && m.GetGenericArguments().Length == 1 && m.GetParameters().Length == 0)
-					.MakeGenericMethod(typeof(MPEventSystemProvider));
-				c.Emit(OpCodes.Callvirt, getComponentGeneric);
+				if (!cameras.TryGetValue(name, out var cameraRig) || cameraRig == null)
+					continue; // this player's camera isn't ready yet this frame
 
-				// Load playerName (local 18)
-				c.Emit(OpCodes.Ldloc_S, (byte) 18);
+				var canvasObject = UnityEngine.Object.Instantiate(__instance.CharacterSelectUILocal);
+				var provider = canvasObject.GetComponent<MPEventSystemProvider>();
+				provider.eventSystem = MPEventSystem.FindByPlayer(localUser.inputPlayer);
 
-				// LocalUserManager.FindLocalUserByPlayerName(playerName)
-				var findLocalUserByPlayerName = typeof(LocalUserManager).GetMethod("FindLocalUserByPlayerName", new[] { typeof(string) });
-				c.Emit(OpCodes.Call, findLocalUserByPlayerName);
+				var voteInfo = canvasObject.GetComponentInChildren<VoteInfoPanelController>();
+				if (voteInfo != null)
+					voteInfo.voteController = __instance.PreGameController.GetComponent<VoteController>();
 
-				// Null check for LocalUser
-				c.Emit(OpCodes.Dup);
-				ILLabel notNull = c.DefineLabel();
-				c.Emit(OpCodes.Brtrue_S, notNull);
-				c.Emit(OpCodes.Pop); // remove null
-				c.Emit(OpCodes.Ldnull);
-				ILLabel afterInputPlayer = c.DefineLabel();
-				c.Emit(OpCodes.Br_S, afterInputPlayer);
-
-				// If not null, get inputPlayer property
-				c.MarkLabel(notNull);
-				var inputPlayerGetter = typeof(RoR2.LocalUser).GetProperty("inputPlayer").GetGetMethod();
-				c.Emit(OpCodes.Callvirt, inputPlayerGetter);
-				c.MarkLabel(afterInputPlayer);
-
-				// MPEventSystem.FindByPlayer(inputPlayer)
-				var findByPlayer = typeof(MPEventSystem).GetMethod("FindByPlayer", new[] { typeof(Rewired.Player) });
-				c.Emit(OpCodes.Call, findByPlayer);
-
-				// Set eventSystem property
-				var eventSystemSetter = typeof(MPEventSystemProvider).GetProperty("eventSystem").GetSetMethod();
-				c.Emit(OpCodes.Callvirt, eventSystemSetter);
-
-				// Jump past the original if/else
-				ILLabel afterInstantiate = c.DefineLabel();
-				c.Emit(OpCodes.Br_S, afterInstantiate);
-
-				// Continue original logic
-				c.MarkLabel(continueLabel);
-
-				// (The original code for PlayerMain/Player2/3/4 continues here)
-
-				c.MarkLabel(afterInstantiate);
-				// (After the fallback logic, execution continues here)
-			}
-			else
-			{
-				Log.Print($"Could not hook '{il.Method.Name}'", ELogChannel.Error);
+				var canvas = canvasObject.GetComponent<Canvas>();
+				canvas.renderMode = RenderMode.ScreenSpaceCamera;
+				canvas.planeDistance = 100 * (i + 1);
+				canvas.worldCamera = cameraRig.uiCam;
+				canvases[name] = canvas;
 			}
 		}
-
-		/*		private static void RunCameraManager_Update_IL(ILContext il)
-				{
-					ILCursor c = new ILCursor(il);
-
-					if (c.TryGotoNext(
-							x => x.MatchLdloc(16),
-							x => x.MatchCallvirt<RoR2.LocalUser>("get_inputPlayer"),
-							x => x.MatchCallvirt<Rewired.Player>("get_name"),
-							x => x.MatchLdstr("PlayerMain"),
-							x => x.MatchCall<string>("op_Equality")
-						))
-					{
-						c.Index += 3;
-
-						MethodInfo logMethod = typeof(HookManager).GetMethod(nameof(LogInputPlayerName), BindingFlags.Public | BindingFlags.Static);
-
-						if (logMethod == null)
-						{
-							Log.Print("RunCameraManager_Update_IL: failed to find LogInputPlayerName method", ELogChannel.Error);
-
-							return;
-						}
-
-						c.Emit(OpCodes.Dup);
-						c.Emit(OpCodes.Call, logMethod);
-					}
-					else
-					{
-						Log.Print($"Could not hook '{il.Method.Name}'", ELogChannel.Error);
-					}
-				}*/
 
 		private static RoR2.UI.ChatBox ChatInstance;
 		private static MethodInfo ChatBox_Update_Orig;

@@ -61,10 +61,10 @@ namespace Dodad.XSplitscreen.Components
 		private static TMPro.TextMeshProUGUI countdownText;
 
 		/// <summary>
-		/// (specter) RoR2's own UI palette. Colors are hardcoded (color-picked off the real game),
-		/// not sampled at runtime - a real HGButton's Image.color is just a neutral white tint, its
-		/// visible color comes from the sprite texture, so there's nothing useful to read there.
-		/// Font is still sampled live, since that does read correctly.
+		/// (specter) RoR2's own UI palette. Colors are hardcoded (color-picked off the real game)
+		/// instead of sampled at runtime, since a real HGButton's Image.color is just a neutral
+		/// white tint - its visible color comes from the sprite texture, so there's nothing useful
+		/// to read there. Font is still sampled live, since that does read correctly.
 		/// </summary>
 		public static Color RoR2ButtonColor { get; private set; } = new Color(0.259f, 0.322f, 0.380f); // #425261
 		public static Color RoR2TextColor { get; private set; } = Color.white; // #ffffff
@@ -86,8 +86,8 @@ namespace Dodad.XSplitscreen.Components
 		/// <summary>
 		/// (specter) Main Panel is full-screen (its background needs to be, to cover edge-to-edge
 		/// like the real game's own menu backdrop), so the Credits/Discord/Back button clones -
-		/// positioned with raw pixel offsets relative to it, not anchor percentages - need their
-		/// own margin instead of inheriting one from Main Panel like they used to.
+		/// positioned with raw pixel offsets relative to it instead of anchor percentages - need
+		/// their own margin instead of inheriting one from Main Panel like they used to.
 		/// </summary>
 		private const float ScreenEdgeMargin = 60f;
 
@@ -250,14 +250,6 @@ namespace Dodad.XSplitscreen.Components
 
 			if (EventSystem.current.currentSelectedGameObject == null)
 				EventSystem.current.SetSelectedGameObject(discordButton.gameObject);
-
-			/*if (EventSystem.current.currentSelectedGameObject != null) return;
-
-			EventSystem.current.SetSelectedGameObject(creditsButton.gameObject);*/
-			/*if (multiMonitorButton.interactable)
-				EventSystem.current.SetSelectedGameObject(multiMonitorButton.gameObject);
-			else
-				EventSystem.current.SetSelectedGameObject(discordButton.gameObject);*/
 		}
 
 		//-----------------------------------------------------------------------------------------------------------
@@ -607,15 +599,10 @@ namespace Dodad.XSplitscreen.Components
 			var discordNav = discordButton.navigation;
 			discordNav.selectOnUp = multiMonitorButton;
 			discordNav.mode = UnityEngine.UI.Navigation.Mode.Explicit;
-			/*discordNav.selectOnDown = backButton;
-
-			var backNav = backButton.navigation;
-			backNav.selectOnUp = discordButton;*/
 
 			creditsButton.navigation = creditsNav;
 			multiMonitorButton.navigation = multiMonitorNav;
 			discordButton.navigation = discordNav;
-			//backButton.navigation = backNav;
 
 			// Text prefab
 			TextPrefab = new GameObject("SimpleText Prefab", typeof(RectTransform), typeof(HGTextMeshProUGUI));
@@ -703,13 +690,10 @@ namespace Dodad.XSplitscreen.Components
 			if (ShowBackupWarning)
 			{
 				var warningText = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
-				// (specter) Token-driven text is stale-cache-prone (see the swap-legend comment
-				// above, same root cause: Plugin.LoadLanguage's language.json merge always lets an
-				// existing on-disk file win over new code defaults) - hardcoded directly so an
-				// updated warning actually reaches returning players, not just fresh installs.
-				// (specter) Resolve the TMP component independently rather than through the
-				// controller's own textMeshPro field - that field is populated in the controller's
-				// OnEnable, and disabling it immediately (below) left it null, NREing on access.
+				// (specter) Hardcoded instead of token-driven, to avoid the same language.json
+				// staleness as the swap-legend comment above. TMP is resolved separately from
+				// the controller's own textMeshPro field, which isn't set until OnEnable -
+				// disabling the controller below would leave it null.
 				var warningTmp = warningText.GetComponentInChildren<TMPro.TMP_Text>();
 				var warningController = warningText.GetComponentInChildren<LanguageTextMeshController>();
 				warningController.enabled = false;
@@ -718,7 +702,6 @@ namespace Dodad.XSplitscreen.Components
 				var warnRect = warningText.gameObject.GetComponent<RectTransform>();
 				warnRect.anchorMax = new Vector2(0.8f, 1f);
 				warnRect.anchorMin = new Vector2(0.2f, 0f);
-				//warnLayout.GetComponent<RectTransform>().sizeDelta = new Vector2(512, 200);
 				warningText.transform.SetParent(notificationGroup.transform.Find("Content").transform);
 				warningText.transform.localScale = Vector3.one;
 				warningText.gameObject.SetActive(true);
@@ -732,35 +715,15 @@ namespace Dodad.XSplitscreen.Components
 			}
 			else
 			{
-				// (specter) Was Destroy() - notificationGroup is the one baked "Notification Panel",
-				// not a clone, so destroying it meant the warning could never show again for the
-				// rest of the session. Hide it instead so OnEnter can bring it back on re-entry.
+				// (specter) Was Destroy() - notificationGroup is the one baked "Notification Panel"
+				// rather than a clone, so destroying it meant the warning could never show again for
+				// the rest of the session. Hidden instead, so OnEnter can bring it back on re-entry.
 				notificationGroup.gameObject.SetActive(false);
 			}
 
 			// Credits
 
 			transform.Find("Credits Panel").gameObject.AddComponent<CreditsController>();
-		}
-
-		private static void LogHierarchy(Transform root)
-		{
-			if (root == null)
-			{
-				Log.Print("LogHierarchy: root is null");
-				return;
-			}
-
-			void Recurse(Transform t, string path, int depth)
-			{
-				string indent = new string(' ', depth * 2);
-				Log.Print($"{indent}{(string.IsNullOrEmpty(path) ? "" : path)}{t.name} (activeSelf: {t.gameObject.activeSelf}, activeInHierarchy: {t.gameObject.activeInHierarchy})");
-
-				for (int i = 0; i < t.childCount; i++)
-					Recurse(t.GetChild(i), string.IsNullOrEmpty(path) ? t.name + "/" : path + t.name + "/", depth + 1);
-			}
-
-			Recurse(root, "", 0);
 		}
 
 		public void OnClaimUpdated(bool state)
@@ -800,8 +763,8 @@ namespace Dodad.XSplitscreen.Components
 			rect.sizeDelta = new Vector2(0f, 40f);
 			rect.anchoredPosition = Vector2.zero;
 
-			// (specter) Raw numeric text, not a localization token - drop the token-driven
-			// controller so it doesn't stomp the countdown text every frame.
+			// (specter) Raw numeric text instead of a localization token, so the token-driven
+			// controller is dropped here to avoid it stomping the countdown text every frame.
 			Destroy(countdownBanner.GetComponentInChildren<LanguageTextMeshController>());
 
 			countdownText = countdownBanner.GetComponent<TMPro.TextMeshProUGUI>();

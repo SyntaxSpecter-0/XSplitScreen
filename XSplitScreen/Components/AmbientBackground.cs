@@ -36,7 +36,7 @@ namespace Dodad.XSplitscreen.Components
 			if (sprite == null) return;
 
 			var rect = (RectTransform) transform;
-			var rand = new System.Random(12345); // (specter) fixed seed - deterministic layout, not truly random
+			var rand = new System.Random(12345); // (specter) fixed seed, for a deterministic layout
 
 			const int count = 6;
 			for (int i = 0; i < count; i++)

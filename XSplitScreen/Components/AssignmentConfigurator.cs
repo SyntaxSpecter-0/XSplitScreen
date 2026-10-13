@@ -265,8 +265,8 @@ namespace Dodad.XSplitscreen.Components
 			_anchoredPanel = currentPanel;
 			_controllerRect = currentPanel.Controller?.GetComponent<RectTransform>();
 
-			// (specter) Parented to Main Panel, not just Assignment Panel, so MoveCursor's clamp
-			// lets it reach the Credits/Discord/Back buttons too.
+			// (specter) Parented to Main Panel instead of just Assignment Panel, so MoveCursor's
+			// clamp lets it reach the Credits/Discord/Back buttons too.
 			if (_cursor != null)
 			{
 				_cursor.SetParent(currentPanel.transform.parent);
@@ -337,7 +337,7 @@ namespace Dodad.XSplitscreen.Components
 
 			// (specter) Hovercast finds the Selectable but never fires a hover event, so a button's
 			// highlight never triggered even though clicking already worked. Driving this player's
-			// own MPEventSystem selection (per-player, not the global EventSystem) fixes that.
+			// own MPEventSystem selection, rather than the global EventSystem, fixes that.
 			if (_hoverTarget != previousTarget)
 				Options.Slot.EventSystem?.SetSelectedObject(_hoverTarget != null ? _hoverTarget.gameObject : null);
 
@@ -359,11 +359,8 @@ namespace Dodad.XSplitscreen.Components
 					return;
 				}
 
-				// (specter) A null profile here means there wasn't one left to pick (e.g. only one
-				// real profile for 2+ players) - letting this through hands the slot to RoR2's own
-				// Guest-profile fallback at launch, which isn't built to survive being saved as if
-				// permanent and can come back as a corrupted profile on next load. Block the claim
-				// instead of silently proceeding.
+				// (specter) A null profile means none was left to assign - letting it through would
+				// hand the slot RoR2's Guest-profile fallback, which can corrupt on next load.
 				if (Options.Slot.Profile == null)
 				{
 					_claim = null;
@@ -426,7 +423,7 @@ namespace Dodad.XSplitscreen.Components
 			if (_cursor != null)
 				Destroy(_cursor.gameObject);
 
-			// (specter) Also reset the anchor state, not just _cursor - otherwise a rebuilt cursor
+			// (specter) Also reset the anchor state alongside _cursor; otherwise a rebuilt cursor
 			// gets skipped by RefreshAnchorIfPanelChanged's "same panel, nothing to do" check and
 			// never gets parented into the UI at all.
 			_anchorInitialized = false;

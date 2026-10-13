@@ -27,8 +27,8 @@ namespace Dodad.XSplitscreen.Components
 		public SplitscreenMenuController Controller => _controller;
 		internal LocalUserSlot[] UserSlots => userContainer.GetComponentsInChildren<LocalUserSlot>();
 
-		// (specter) Content's own direct children are now just the 2 column containers, not
-		// slots (see Initialize()) - count actual LocalUserSlot components instead.
+		// (specter) Content's own direct children are now the 2 column containers instead of
+		// slots (see Initialize()), so this counts actual LocalUserSlot components.
 		internal int FilledSlots => UserSlots.Length;
 
 		private GameObject userPrefab;
@@ -48,11 +48,8 @@ namespace Dodad.XSplitscreen.Components
 		//-----------------------------------------------------------------------------------------------------------
 
 		/// <summary>
-		/// (specter) Drives the 2-column layout by hand every frame: each column's width/X
-		/// position, and Content's height (the taller column). HorizontalLayoutGroup's cross-axis
-		/// positioning wouldn't hold a column at a fixed offset no matter how childControlHeight
-		/// was set (confirmed via testing), so columns are plain top-left-anchored points (see
-		/// CreateColumn) with no LayoutGroup involved at all - just field assignments here.
+		/// (specter) Drives the 2-column layout by hand every frame - see the layout removal
+		/// comment near CreateColumn for why no LayoutGroup is involved here.
 		/// </summary>
 		public void LateUpdate()
 		{
@@ -93,11 +90,9 @@ namespace Dodad.XSplitscreen.Components
 						continue;
 
 					// (specter) Before a controller is claimed into a slot, Rewired still has it
-					// attached to PlayerMain alongside keyboard+mouse, so any of them pressing join
-					// fires through here - TryAddPlayerToSlot grabs the actual triggering device
-					// below, not "PlayerMain" itself, so there's no hijack to guard against. An
-					// earlier device-key filter here blocked every non-keyboard device from ever
-					// joining - removed.
+					// attached to PlayerMain alongside keyboard+mouse. TryAddPlayerToSlot below grabs
+					// the actual triggering device instead of "PlayerMain" itself, so any of them
+					// joining here is safe.
 					if (currentPlayer.GetButtonDown(11))
 						TryAddPlayerToSlot(currentPlayer);
 				}
@@ -178,7 +173,7 @@ namespace Dodad.XSplitscreen.Components
 			if (freeSlot == null)
 				return false;
 
-			// (specter) into one of the 2 columns, not Content directly - see Initialize().
+			// (specter) Into one of the 2 columns instead of Content directly - see Initialize().
 			slot.transform.SetParent(GetTargetColumn());
 
 			if (transform.childCount == MAX_USERS)
@@ -223,18 +218,15 @@ namespace Dodad.XSplitscreen.Components
 					juice.TransitionPanFromLeft();
 				});
 
-				// (specter) The visible list scrolls (see menu.prefab's Slots/Viewport/Content) -
-				// slots are parented into Content, not the ScrollRect root itself.
+				// (specter) The visible list scrolls (see menu.prefab's Slots/Viewport/Content), so
+				// slots are parented into Content instead of the ScrollRect root itself.
 				userContainer = transform.Find("Slots/Viewport/Content");
 
-				// (specter) Content ships with a single-column VerticalLayoutGroup + ContentSizeFitter.
-				// A HorizontalLayoutGroup couldn't hold the 2 columns at a fixed cross-axis offset no
-				// matter the childControlHeight setting (confirmed via testing), so both are removed:
-				// columns anchor directly to Content's corners instead (see CreateColumn), and
-				// LateUpdate sizes Content to the taller column by hand.
-				// DestroyImmediate, not Destroy: a GameObject can only carry one LayoutGroup, and
-				// Destroy() doesn't remove it until end of frame - code right after this would still
-				// see the old component present.
+				// (specter) No LayoutGroup holds the 2 columns at a fixed cross-axis offset, so
+				// Content's baked VerticalLayoutGroup + ContentSizeFitter are removed; columns anchor
+				// directly to Content's corners instead (CreateColumn), sized by hand in LateUpdate.
+				// Uses DestroyImmediate instead of Destroy, since Destroy() leaves the component
+				// present until end of frame, and a GameObject can only carry one LayoutGroup at a time.
 				var oldLayout = userContainer.GetComponent<VerticalLayoutGroup>();
 				if (oldLayout != null)
 					UnityEngine.Object.DestroyImmediate(oldLayout);
@@ -320,10 +312,10 @@ namespace Dodad.XSplitscreen.Components
 
 		internal LocalUserSlot GetFreeSlot()
 		{
-			// (specter) LocalUserSlot.Instances is ordered by creation, not by on-screen position -
-			// picking the first free one in that order could land a new player in the right column
-			// while a slot higher up the left column sits empty (e.g. right after someone leaves).
-			// Sort by actual reading order (left column top-to-bottom, then right) instead.
+			// (specter) LocalUserSlot.Instances is ordered by creation instead of on-screen position,
+			// so picking the first free one in that order could land a new player in the right
+			// column while a slot higher up the left column sits empty (e.g. right after someone
+			// leaves). This sorts by actual reading order instead (left column top-to-bottom, then right).
 			return LocalUserSlot.Instances
 				.Where(instance => instance.LocalPlayer == null &&
 					(instance.transform.parent == _columnLeft || instance.transform.parent == _columnRight))
@@ -407,7 +399,7 @@ namespace Dodad.XSplitscreen.Components
 		//-----------------------------------------------------------------------------------------------------------
 
 		/// <summary>
-		/// DEBUG: Resets controller changes
+		/// Unsubscribes from controller-connect events while the menu is closed.
 		/// </summary>
 		private void OnExit()
 		{

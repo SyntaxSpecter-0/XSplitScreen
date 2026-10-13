@@ -217,8 +217,8 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		/// <summary>
-		/// (specter) Wires up to the pre-built ColorContent elements. Lazy (first Open(), not
-		/// Awake()) since Options isn't assigned until just after Awake() runs.
+		/// (specter) Wires up to the pre-built ColorContent elements. Resolved lazily on the first
+		/// Open() instead of Awake(), since Options isn't assigned until just after Awake() runs.
 		/// </summary>
 		private void ResolveUI()
 		{

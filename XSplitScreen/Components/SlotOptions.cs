@@ -60,8 +60,8 @@ namespace Dodad.XSplitscreen.Components
 
 		/// <summary>
 		/// (specter) Coverflow tab bar: all 3 tabs stay visible, one Centered and the other two
-		/// shrunk/dimmed to Left/Right. Plain per-frame Lerp, not UIJuice - its internals are
-		/// stripped in the stub assembly this mod compiles against.
+		/// shrunk/dimmed to Left/Right. Plain per-frame Lerp instead of UIJuice, since its
+		/// internals are stripped in the stub assembly this mod compiles against.
 		/// </summary>
 		private enum TabRole { Center, Left, Right }
 		private TabRole[] _tabRoles;
@@ -217,7 +217,7 @@ namespace Dodad.XSplitscreen.Components
 			else if (Slot.Input.Down)
 				_cyclable[_configuratorIndex].OnNavigate(1);
 
-			DisplayOptionName(); // (specter) keeps tab/panel state in sync every frame, not just on switch
+			DisplayOptionName(); // (specter) keeps tab/panel state in sync every frame, instead of only on switch
 		}
 
 		/// <summary>
@@ -265,10 +265,9 @@ namespace Dodad.XSplitscreen.Components
 				OptionConfigurator configurator = (OptionConfigurator) new GameObject(type.Name).AddComponent(type);
 				configurator.gameObject.AddComponent<RectTransform>();
 				// (specter) These are logic-only components parented onto CollapsedRow (since
-				// SlotOptions lives there) - without this, each one (5 of them) still counts as an
-				// active sibling in its HorizontalLayoutGroup, adding a 10px spacing gap apiece with
-				// zero visual width to show for it. Confirmed via diagnostic: ~50px of dead space
-				// sitting after the Y-toggle glyph, dwarfing any padding/spacer tweak.
+				// SlotOptions lives there) - without this, each one still counts as an active
+				// sibling in its HorizontalLayoutGroup, adding a 10px spacing gap with zero visual
+				// width to show for it.
 				configurator.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
 				_configurators.Add(configurator);
 
@@ -322,7 +321,7 @@ namespace Dodad.XSplitscreen.Components
 
 		/// <summary>
 		/// (specter) Switches the active tab within the gamepad flow's cyclable list, wrapping
-		/// around. Does not touch IsExpanded - the panel stays open across a tab switch.
+		/// around. Leaves IsExpanded untouched, so the panel stays open across a tab switch.
 		/// </summary>
 		private void SwitchCyclableTab(int direction)
 		{
@@ -401,8 +400,8 @@ namespace Dodad.XSplitscreen.Components
 
 		#region UI Methods
 
-		// (specter) Read live off SplitscreenMenuController - not cached, since these tabs can
-		// render before its own HGButton color-sampling runs.
+		// (specter) Read live off SplitscreenMenuController instead of cached, since these tabs
+		// can render before its own HGButton color-sampling runs.
 		private static Color TabTextColor => SplitscreenMenuController.RoR2TextColor;
 		private static Color TabMutedColor => SplitscreenMenuController.RoR2MutedColor;
 		private static readonly Color Transparent = new Color(0, 0, 0, 0);
@@ -525,8 +524,8 @@ namespace Dodad.XSplitscreen.Components
 			var valueText = valueTextTransform.GetComponent<TextMeshProUGUI>();
 			valueText.text = token == null ? "" : ResolveToken(token);
 			valueText.color = color;
-			// (specter) No size floor means a long value forces siblings (glyphs, accent bar) to
-			// overflow instead. Let it shrink first.
+			// (specter) Without a size floor, a long value would force siblings (glyphs, accent bar)
+			// to overflow; auto-sizing lets it shrink first instead.
 			valueText.enableAutoSizing = true;
 			valueText.fontSizeMin = 12;
 			valueText.fontSizeMax = 19;

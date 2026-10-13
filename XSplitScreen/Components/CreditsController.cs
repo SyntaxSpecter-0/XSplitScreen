@@ -73,8 +73,8 @@ namespace Dodad.XSplitscreen.Components
 			_group = GetComponent<CanvasGroup>();
 		}
 
-		// (specter) Check every slot's input, not just SplitscreenMenuController.MainInput -
-		// otherwise a non-host controller could open credits but never close them.
+		// (specter) Check every slot's input in addition to SplitscreenMenuController.MainInput,
+		// since a non-host controller could otherwise open credits but never close them.
 		private static bool AnyCloseInputPressed()
 		{
 			if (SplitscreenMenuController.MainInput != null &&

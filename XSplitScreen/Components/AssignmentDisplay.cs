@@ -72,9 +72,7 @@ namespace Dodad.XSplitscreen.Components
 			var xTex = Plugin.Resources.LoadAsset<Texture2D>("device_x.png");
 			image1.sprite = Sprite.Create(xTex, new Rect(0, 0, xTex.width, xTex.height), new Vector2(0.5f, 0.5f));
 
-			// 
-
-			gameObject.GetComponent<UnityEngine.UI.Image>().enabled = false;// color = new Color(UnityEngine.Random.Range(0.2f, 1f), UnityEngine.Random.Range(0.2f, 1f), UnityEngine.Random.Range(0.2f, 1f), 0.5f);
+			gameObject.GetComponent<UnityEngine.UI.Image>().enabled = false;
 
 			rectTransform = GetComponent<RectTransform>();
 			juice = gameObject.GetComponent<UIJuice>();
@@ -203,7 +201,7 @@ namespace Dodad.XSplitscreen.Components
 
 			// Compute scale (fit grid into 80% of parent min dimension, maintaining 1:1 aspect)
 			float parentMin = Mathf.Min(parentWidth, parentHeight);
-			float gridScale = parentMin * percent;//0.8f;
+			float gridScale = parentMin * percent;
 			float scaleX = gridScale / gridNormWidth;
 			float scaleY = gridScale / gridNormHeight;
 
