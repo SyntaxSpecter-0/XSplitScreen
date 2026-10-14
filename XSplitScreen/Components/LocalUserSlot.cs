@@ -23,16 +23,6 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		internal static List<LocalUserSlot> Instances { get; private set; }
 
-		// (specter) Which slot each controller last belonged to, for routing reconnects.
-		private static readonly Dictionary<int, LocalUserSlot> _lastSlotForController = new();
-
-		internal static LocalUserSlot GetLastSlotForController(int controllerId)
-		{
-			return _lastSlotForController.TryGetValue(controllerId, out var slot) && Instances != null && Instances.Contains(slot)
-				? slot
-				: null;
-		}
-
 		/// <summary>
 		/// Dictionary mapping device types to UI icons.
 		/// </summary>
@@ -49,14 +39,31 @@ namespace Dodad.XSplitscreen.Components
 		public static Action<LocalUserSlot> OnPlayerChanged;
 
 		public static Action OnRemovedKeyboardUser;
+
+		/// <summary>
+		/// (specter) Remembers which slot a controller last belonged to, so reconnecting
+		/// (LocalUserPanel.OnControllerAddedEvent) sends it back to its previous slot instead of
+		/// whatever empty one happens to be found first.
+		/// </summary>
+		private static readonly Dictionary<int, LocalUserSlot> _lastSlotForController = new();
+
+		internal static LocalUserSlot GetLastSlotForController(int controllerId)
+		{
+			return _lastSlotForController.TryGetValue(controllerId, out var slot) && Instances != null && Instances.Contains(slot)
+				? slot
+				: null;
+		}
 		#endregion
 
 		#region Public Properties
 
 		public UnityEngine.Rect ScreenRect => _options.GetConfigurator<AssignmentConfigurator>()?.Rect ?? new(0, 0, 1, 1);
 
-		// (specter) The slot outlives its player, so release the profile/color on removal or the
-		// next occupant inherits them.
+		/// <summary>
+		/// (specter) Releases this slot's profile and resets its accent color. Call before
+		/// removing a player from a slot that stays alive, or the next occupant inherits their
+		/// profile/color/trails.
+		/// </summary>
 		internal void ReleaseProfile()
 		{
 			_options?.GetConfigurator<ProfileConfigurator>()?.ReleaseProfile();
@@ -76,7 +83,6 @@ namespace Dodad.XSplitscreen.Components
 				_localPlayer = value;
 				SetLocalPlayerListenerState(true);
 				_provider.eventSystem = value == null ? null : MPEventSystem.FindByPlayer(value);
-
 				name = $"[{(value == null ? "Open" : value.name)}] Local User Slot {Instances.IndexOf(this)}";
 				OnPlayerChanged?.Invoke(this);
 			}
@@ -97,6 +103,11 @@ namespace Dodad.XSplitscreen.Components
 
 				_profile = value;
 
+				if (_nameText != null)
+					_nameText.text = value != null ? value.name : "Player";
+				if (_readyCheck != null)
+					_readyCheck.SetActive(value != null);
+
 				OnLoadProfile?.Invoke();
 			}
 		}
@@ -108,33 +119,16 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		public bool IsKeyboardUser => LocalPlayer?.controllers.hasKeyboard ?? false;
 
-		public Action<int> OnNavigateIndex;
 		public Action OnCancel;
-		public Action OnConfirm;
 		public Action OnUnloadProfile;
 		public Action OnLoadProfile;
 		
-		public int NavigatorCount
-		{
-			set => _navigationController.SetDotCount(value);
-		}
-
-		public int NavigatorIndex
-		{
-			set => _navigationController.SetDotIndex(value);
-		}
-
-		public bool EnableConfirmButton
-		{
-			get => _confirmButton.interactable;
-			set => _confirmButton.interactable = value;
-		}
-
-		public bool EnableCancelButton
-		{
-			get => _cancelButton.interactable;
-			set => _cancelButton.interactable = value;
-		}
+		// (specter) No-op stubs - the redesign dropped the dot indicator and the separate
+		// Confirm/Cancel buttons, but SlotOptions still calls these.
+		public int NavigatorCount { set { } }
+		public int NavigatorIndex { set { } }
+		public bool EnableConfirmButton { get; set; }
+		public bool EnableCancelButton { get; set; }
 
 		#endregion
 
@@ -145,6 +139,7 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		internal InputBank Input = new InputBank();
 		internal LocalUserPanel Panel => _panel;
+		internal MPEventSystem EventSystem => _provider?.eventSystem;
 		#endregion
 
 		#region Private Fields
@@ -155,17 +150,27 @@ namespace Dodad.XSplitscreen.Components
 		private MPEventSystemProvider _provider;
 		private UIJuice _juice;
 
-		// UI Elements
+		// (specter) UI elements - matches the userslot.prefab layout (collapsed row that expands in place)
 		private Image _deviceIcon;
-		private Transform _titleContainer;
-		private Transform _configuratorContainer;
+		private LayoutElement _deviceIconLayout;
+		private Transform _collapsedRow;
+		private Transform _expandedContent;
+		private Image _accentStrip;
+		private TextMeshProUGUI _nameText;
+		private GameObject _titleTextGO;
 		private LanguageTextMeshController _titleController;
-		private MPButton _cancelButton;
-		private MPButton _confirmButton;
-		private Image _cancelImage;
-		private Image _confirmImage;
+		private GameObject _readyCheck;
+		private MPButton _yToggleButton;
+		private RectTransform _yChevron;
+		private GameObject _configureSpacer;
+		private GameObject _genericSpacer;
 		private SlotOptions _options;
-		private NavigatorDotController _navigationController;
+		private TextMeshProUGUI _yLabel, _lbLabel, _rbLabel;
+		private TextMeshProUGUI[] _aButtonLabels;
+		private TextMeshProUGUI[] _upArrowLabels, _downArrowLabels;
+		private Outline _yOutline;
+		private Outline[] _aButtonOutlines;
+		private bool _themeApplied;
 		#endregion
 
 		#region Unity Lifecycle
@@ -199,6 +204,18 @@ namespace Dodad.XSplitscreen.Components
 			UpdateInput();
 			UpdateDeviceIconAlpha();
 			HandleDisplaySlotMovement();
+			UpdateExpandedVisibility();
+		}
+
+		/// <summary>
+		/// (specter) Shows/hides ExpandedContent to match SlotOptions.IsExpanded.
+		/// </summary>
+		private void UpdateExpandedVisibility()
+		{
+			bool expanded = _options != null && _options.IsExpanded;
+
+			if (_expandedContent.gameObject.activeSelf != expanded)
+				_expandedContent.gameObject.SetActive(expanded);
 		}
 
 		/// <summary>
@@ -236,8 +253,9 @@ namespace Dodad.XSplitscreen.Components
 
 		private void SetupOptionsUI()
 		{
-			_configuratorContainer = transform.Find("ConfiguratorContainer/MainContainer");
-			_options = _configuratorContainer.gameObject.AddComponent<SlotOptions>();
+			// (specter) Lives on CollapsedRow instead of ExpandedContent, so it keeps running while
+			// collapsed - it's what detects the Y press that opens the panel.
+			_options = transform.Find("CollapsedRow").gameObject.AddComponent<SlotOptions>();
 		}
 
 		/// <summary>
@@ -250,56 +268,382 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		/// <summary>
-		/// Sets up the title UI components.
+		/// (specter) Sets up the collapsed row's UI components (swatch, name, ready check,
+		/// title/placeholder text, Y toggle).
 		/// </summary>
 		private void SetupTitleUI()
 		{
-			_deviceIcon = transform.Find("DeviceIcon").GetComponent<Image>();
+			_collapsedRow = transform.Find("CollapsedRow");
+			_expandedContent = transform.Find("ExpandedContent");
+			_genericSpacer = _collapsedRow.Find("Spacer").gameObject;
+
+			// (specter) Row is packed with zero slack even at rest - nothing shrinks further to
+			// absorb ReadyCheck's spacing gap when it turns on. Trim spacing to buy that room back.
+			var collapsedHorizontal = _collapsedRow.GetComponent<HorizontalLayoutGroup>();
+			if (collapsedHorizontal != null)
+			{
+				collapsedHorizontal.spacing = 10;
+				// (specter) Baked 10px right padding left a visible gap between the glyph and the
+				// row's true edge - tightened just the right side so it sits flush.
+				var padding = collapsedHorizontal.padding;
+				padding.right = 8;
+				collapsedHorizontal.padding = padding;
+			}
+
+			_deviceIcon = _collapsedRow.Find("DeviceIcon").GetComponent<Image>();
 			_deviceIcon.enabled = false;
-			_titleContainer = transform.Find("ConfiguratorContainer/TitleContainer");
+			_deviceIconLayout = _deviceIcon.GetComponent<LayoutElement>();
+
+			_accentStrip = _collapsedRow.Find("AccentStrip").GetComponent<Image>();
+			_nameText = _collapsedRow.Find("NameText").GetComponent<TextMeshProUGUI>();
+			// (specter) Auto-sizing alone doesn't shrink what width TMP requests from the layout
+			// system - needs an explicit LayoutElement floor too, or a long name forces overflow.
+			_nameText.enableAutoSizing = true;
+			_nameText.fontSizeMin = 10;
+			_nameText.fontSizeMax = 17;
+			var nameLayout = _nameText.gameObject.AddComponent<LayoutElement>();
+			// (specter) flexibleWidth=0 so NameText never competes with the generic Spacer for
+			// surplus space - that spacer is now the sole absorber, pushing Configure+glyph flush
+			// to the row's right edge instead of splitting any extra room between the two.
+			nameLayout.flexibleWidth = 0;
+			nameLayout.minWidth = 40;
+			// (specter) Unity's layout group only uses flexibleWidth to split SURPLUS space - once
+			// the row needs to shrink (which it always does here), each child just shrinks within
+			// its own preferred-to-min range regardless of weight. NameText's uncapped preferred
+			// width (TMP's natural unwrapped size) was eating the row's whole deficit by itself,
+			// leaving nothing for Configure/glyph to gain. Capping it directly frees real width.
+			nameLayout.preferredWidth = 90;
+			_readyCheck = _collapsedRow.Find("ReadyCheck").gameObject;
+			// (specter) Baked minWidth=20 is a hard floor it can't shrink below - let it compress
+			// like every other glyph so turning it on doesn't force the row wider.
+			var readyLayout = _readyCheck.GetComponent<LayoutElement>();
+			if (readyLayout != null)
+				readyLayout.minWidth = 0;
+
+			// (specter) Localized "press start" placeholder, using RoR2's own SimpleText prefab in
+			// place of the plain placeholder Text the prefab-builder script left here.
+			var placeholder = _collapsedRow.Find("TitleText");
+			if (placeholder != null) Destroy(placeholder.gameObject);
 
 			var messageText = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
-			messageText.transform.SetParent(_titleContainer, false);
-			var messageRect = messageText.GetComponent<RectTransform>();
-			messageRect.anchorMin = Vector2.zero;
-			messageRect.anchorMax = Vector2.one;
+			messageText.transform.SetParent(_collapsedRow, false);
+			messageText.name = "TitleText";
+			var messageLayout = messageText.AddComponent<LayoutElement>();
+			messageLayout.flexibleWidth = 1;
 			_titleController = messageText.GetComponentInChildren<LanguageTextMeshController>();
 			var messageHgText = messageText.GetComponent<HGTextMeshProUGUI>();
 			messageHgText.maxVisibleLines = 1;
 			messageHgText.overflowMode = TextOverflowModes.Overflow;
-			messageHgText.alignment = TextAlignmentOptions.Center;
-			messageHgText.horizontalAlignment = HorizontalAlignmentOptions.Center;
+			// (specter) The stock SimpleText prefab has TMP auto-sizing on, which shrinks the font
+			// for the longer keyboard string but not the shorter gamepad one - lock the size so
+			// both render identically.
+			messageHgText.enableAutoSizing = false;
+			messageHgText.fontSize = 15f;
+			messageHgText.alignment = TextAlignmentOptions.Midline;
 			messageText.AddComponent<MPButton>();
+			_titleTextGO = messageText;
 			SetMessage("XSS_PRESS_START_KBM");
 			messageText.gameObject.SetActive(true);
 		}
 
 		/// <summary>
-		/// Sets up the navigation button UI components.
+		/// (specter) Wires the Y-toggle and LB/RB shoulder buttons for mouse clicks (gamepad reads
+		/// these directly via InputBank/SlotOptions - this just gives mouse users the same actions).
 		/// </summary>
 		private void SetupNavigatorUI()
 		{
-			_navigationController = transform.Find("ConfiguratorContainer/Navigation").gameObject.AddComponent<NavigatorDotController>();
-			_navigationController.OnNavigate += (x) => OnNavigateIndex?.Invoke(x);
+			var yToggle = _collapsedRow.Find("YToggle");
+			_yToggleButton = yToggle.gameObject.AddComponent<MPButton>();
+			_yToggleButton.allowAllEventSystems = true;
+			_yToggleButton.onClick.AddListener(() => _options.ToggleExpanded());
+			_yLabel = yToggle.Find("YCircle/Label").GetComponent<TextMeshProUGUI>();
+			_yLabel.color = SplitscreenMenuController.RoR2TextColor; // (specter) was still the baked muted grey
+			_yOutline = yToggle.Find("YCircle").GetComponent<Outline>();
 
-			NavigatorCount = 0;
+			// (specter) Bumped up from the baked 20x20/11pt - too small next to the other enlarged
+			// glyphs. No minWidth/Height floor, same reasoning as SetGlyphBoxSize below.
+			var yCircleLayout = yToggle.Find("YCircle").GetComponent<LayoutElement>();
+			yCircleLayout.preferredWidth = 28;
+			yCircleLayout.preferredHeight = 28;
+			_yLabel.fontSize = 17;
 
-			_cancelButton = transform.Find("ConfiguratorContainer/CancelButton").gameObject.AddComponent<MPButton>();
-			_confirmButton = transform.Find("ConfiguratorContainer/ConfirmButton").gameObject.AddComponent<MPButton>();
+			// (specter) Chevron repurposed into a "Configure" label, pulled out of yToggle and
+			// reparented under CollapsedRow with its own spacer, so it floats near the checkmark.
+			_yChevron = yToggle.Find("Chevron").GetComponent<RectTransform>();
+			_yChevron.SetParent(_collapsedRow, false);
+			_yChevron.SetSiblingIndex(yToggle.GetSiblingIndex());
+			var configureLabel = _yChevron.GetComponent<TextMeshProUGUI>();
+			configureLabel.text = "Configure";
+			configureLabel.color = SplitscreenMenuController.RoR2TextColor;
+			// (specter) Unset minWidth defers to TMP's own unwrapped-text width, which is rigid -
+			// same bug as NameText/ValueText. Auto-size + explicit low minWidth fixes it here too.
+			configureLabel.enableAutoSizing = true;
+			configureLabel.fontSizeMin = 12;
+			configureLabel.fontSizeMax = 18;
+			var configureLayout = _yChevron.GetComponent<LayoutElement>();
+			configureLayout.preferredWidth = 100;
+			configureLayout.minWidth = 20;
 
-			_cancelButton.interactable = false;
-			_cancelButton.allowAllEventSystems = true;
-			_confirmButton.interactable = false;
-			_confirmButton.allowAllEventSystems = true;
+			// (specter) Small FIXED gap between "Configure" and the glyph - not flexible, so the two
+			// stay a tight unit instead of drifting apart under surplus space. The generic Spacer
+			// before them is what pushes the whole pair flush to the row's right edge.
+			_configureSpacer = new GameObject("ConfigureSpacer", typeof(RectTransform));
+			_configureSpacer.transform.SetParent(_collapsedRow, false);
+			_configureSpacer.transform.SetSiblingIndex(yToggle.GetSiblingIndex());
+			var configureSpacerLayout = _configureSpacer.AddComponent<LayoutElement>();
+			configureSpacerLayout.preferredWidth = 12;
+			configureSpacerLayout.minWidth = 12;
 
-			_cancelImage = _cancelButton.GetComponent<Image>();
-			_confirmImage = _confirmButton.GetComponent<Image>();
+			var lbButtonNode = _expandedContent.Find("TabBar/LBButton");
+			var lbButton = lbButtonNode.gameObject.AddComponent<MPButton>();
+			lbButton.allowAllEventSystems = true;
+			lbButton.onClick.AddListener(() => _options.ClickShoulder(-1));
+			_lbLabel = lbButtonNode.Find("Label").GetComponent<TextMeshProUGUI>();
+			SetGlyphBoxSize(_lbLabel, 28);
+			SetupShoulderChevron(lbButtonNode.Find("Chevron").GetComponent<TextMeshProUGUI>());
 
-			_cancelImage.enabled = false;
-			_confirmImage.enabled = false;
+			var rbButtonNode = _expandedContent.Find("TabBar/RBButton");
+			var rbButton = rbButtonNode.gameObject.AddComponent<MPButton>();
+			rbButton.allowAllEventSystems = true;
+			rbButton.onClick.AddListener(() => _options.ClickShoulder(1));
+			_rbLabel = rbButtonNode.Find("Label").GetComponent<TextMeshProUGUI>();
+			SetGlyphBoxSize(_rbLabel, 28);
+			SetupShoulderChevron(rbButtonNode.Find("Chevron").GetComponent<TextMeshProUGUI>());
 
-			_cancelButton.onClick.AddListener(() => TryRemoveSlot());
-			_confirmButton.onClick.AddListener(() => OnConfirm?.Invoke());
+			// (specter) Divider between the tab name and its value, distinct from the baked
+			// "Separator" (that's header-vs-panel). Inserted once, right after TabBar.
+			var tabBarNode = _expandedContent.Find("TabBar");
+			var valueSeparator = new GameObject("ValueSeparator", typeof(RectTransform));
+			valueSeparator.transform.SetParent(_expandedContent, false);
+			valueSeparator.transform.SetSiblingIndex(tabBarNode.GetSiblingIndex() + 1);
+			var valueSeparatorLayout = valueSeparator.AddComponent<LayoutElement>();
+			valueSeparatorLayout.preferredHeight = 2;
+			valueSeparatorLayout.minHeight = 2;
+			valueSeparatorLayout.flexibleWidth = 1;
+			valueSeparator.AddComponent<Image>().color = SplitscreenMenuController.RoR2MutedColor;
+
+			_aButtonLabels = new TextMeshProUGUI[3];
+			_aButtonOutlines = new Outline[3];
+			var contentNames = new[] { "ProfileContent", "ColorContent", "TrailsContent" };
+			for (int i = 0; i < contentNames.Length; i++)
+			{
+				var content = _expandedContent.Find(contentNames[i]);
+				// (specter) Profile/Trails' AButton is a direct child - the old "ValueRow" wrapper
+				// was removed when the panel became a single row.
+				var aButtonPath = contentNames[i] == "ColorContent" ? "SwatchRow/AButton" : "AButton";
+				var aButtonNode = content.Find(aButtonPath);
+				var aButton = aButtonNode.gameObject.AddComponent<MPButton>();
+				aButton.allowAllEventSystems = true;
+				aButton.onClick.AddListener(() => _options.ClickConfirm());
+				_aButtonLabels[i] = aButtonNode.Find("Label").GetComponent<TextMeshProUGUI>();
+				_aButtonLabels[i].color = SplitscreenMenuController.RoR2TextColor; // (specter) was still the baked muted grey
+				_aButtonOutlines[i] = aButtonNode.GetComponent<Outline>();
+			}
+
+			// (specter) Only Profile/Trails use the MakeValuePanel shape (Up/Down arrow browsing) -
+			// ColorContent has its own left/right hue-bar shape instead.
+			var valuePanelNames = new[] { "ProfileContent", "TrailsContent" };
+			_upArrowLabels = new TextMeshProUGUI[valuePanelNames.Length];
+			_downArrowLabels = new TextMeshProUGUI[valuePanelNames.Length];
+			for (int i = 0; i < valuePanelNames.Length; i++)
+			{
+				var content = _expandedContent.Find(valuePanelNames[i]);
+				_upArrowLabels[i] = content.Find("UpArrow").GetComponent<TextMeshProUGUI>();
+				_downArrowLabels[i] = content.Find("DownArrow").GetComponent<TextMeshProUGUI>();
+				SetGlyphBoxSize(_upArrowLabels[i], 30);
+				SetGlyphBoxSize(_downArrowLabels[i], 30);
+				WrapGlyphInBox(_upArrowLabels[i], 30);
+				WrapGlyphInBox(_downArrowLabels[i], 30);
+				_upArrowLabels[i].color = SplitscreenMenuController.RoR2TextColor;
+				_downArrowLabels[i].color = SplitscreenMenuController.RoR2TextColor;
+			}
+
+			// (specter) ColorContent's own hue-bar arrows were still the baked muted grey - every
+			// non-background glyph should be white.
+			var colorContent = _expandedContent.Find("ColorContent");
+			colorContent.Find("HueRow/LeftArrow").GetComponent<TextMeshProUGUI>().color = SplitscreenMenuController.RoR2TextColor;
+			colorContent.Find("HueRow/RightArrow").GetComponent<TextMeshProUGUI>().color = SplitscreenMenuController.RoR2TextColor;
+
+			UpdateInputGlyphs();
+		}
+
+		/// <summary>
+		/// (specter) Pins a glyph to a fixed box - unset minWidth/Height default to -1 and defer to
+		/// TMP's own preferred size, which balloons once a sprite glyph replaces the original text.
+		/// </summary>
+		private static void SetGlyphBoxSize(TextMeshProUGUI label, float size)
+		{
+			var layout = label.GetComponent<LayoutElement>() ?? label.gameObject.AddComponent<LayoutElement>();
+			layout.preferredWidth = size;
+			layout.preferredHeight = size;
+			layout.minWidth = 0;
+			layout.minHeight = 0;
+		}
+
+		/// <summary>
+		/// (specter) Wraps a bare glyph in the same invisible-fill + outline box MakeAButton uses, so
+		/// it reads as a real button. The glyph's own LayoutElement is ignored - the box owns sizing.
+		/// </summary>
+		private static void WrapGlyphInBox(TextMeshProUGUI glyph, float boxSize)
+		{
+			var glyphTransform = glyph.transform;
+			var parent = glyphTransform.parent;
+			int siblingIndex = glyphTransform.GetSiblingIndex();
+
+			var box = new GameObject(glyph.name + "Box", typeof(RectTransform));
+			box.transform.SetParent(parent, false);
+			box.transform.SetSiblingIndex(siblingIndex);
+
+			var boxLayout = box.AddComponent<LayoutElement>();
+			boxLayout.preferredWidth = boxSize;
+			boxLayout.preferredHeight = boxSize;
+			boxLayout.minWidth = 0;
+			boxLayout.minHeight = 0;
+
+			var boxImage = box.AddComponent<Image>();
+			boxImage.color = new Color(0, 0, 0, 0);
+			var outline = box.AddComponent<Outline>();
+			outline.effectColor = SplitscreenMenuController.RoR2MutedColor;
+			outline.effectDistance = new Vector2(1f, -1f);
+
+			glyphTransform.SetParent(box.transform, false);
+			var glyphRect = (RectTransform) glyphTransform;
+			glyphRect.anchorMin = Vector2.zero;
+			glyphRect.anchorMax = Vector2.one;
+			glyphRect.offsetMin = Vector2.zero;
+			glyphRect.offsetMax = Vector2.zero;
+
+			var glyphLayout = glyph.GetComponent<LayoutElement>();
+			if (glyphLayout != null)
+				glyphLayout.ignoreLayout = true;
+		}
+
+		// (specter) Baked prefab puts Chevron above Label in the VerticalLayoutGroup - moved below
+		// and sized up a touch so the direction arrow reads as functional, instead of a decoration
+		// floating over the L1/R1 letters.
+		private static void SetupShoulderChevron(TextMeshProUGUI chevron)
+		{
+			chevron.transform.SetAsLastSibling();
+			chevron.fontSize = 20;
+			SetGlyphBoxSize(chevron, 20);
+		}
+
+		/// <summary>
+		/// (specter) (asset, confirm sprite, north sprite, LB/L1 sprite, RB/R1 sprite, D-pad up
+		/// sprite, D-pad down sprite) per gamepad family, matching RoR2.Glyphs' own registration
+		/// calls. RoR2.Glyphs.GetGlyphString resolves through Rewired's per-player action bindings,
+		/// which our slot players don't have, so it always falls back to blank/unbound; this builds
+		/// the same sprite tags directly instead. PS5 reuses the PS4 sheet, since its face
+		/// buttons/D-pad are visually identical.
+		/// </summary>
+		// (specter) internal instead of private, since SplitscreenMenuController reuses xbox/ps4
+		// LB/RB tags verbatim for the static "swap monitors" legend.
+		internal static readonly Dictionary<string, (string asset, string confirm, string north, string lb, string rb, string up, string down)> GamepadGlyphs = new()
+		{
+			["xbox"] = ("tmpsprXboxOneGlyphs", "texXBoxOneGlyphs_0", "texXBoxOneGlyphs_11", "texXBoxOneGlyphs_2", "texXBoxOneGlyphs_6", "texXBoxOneGlyphs_14", "texXBoxOneGlyphs_15"),
+			["ps4"] = ("tmpsprPS4GlyphsUnified", "texPS4GlyphsUnified_0", "texPS4GlyphsUnified_1", "texPS4GlyphsUnified_4", "texPS4GlyphsUnified_5", "texPS4GlyphsUnified_21", "texPS4GlyphsUnified_22"),
+			["ps5"] = ("tmpsprPS4GlyphsUnified", "texPS4GlyphsUnified_0", "texPS4GlyphsUnified_1", "texPS4GlyphsUnified_4", "texPS4GlyphsUnified_5", "texPS4GlyphsUnified_21", "texPS4GlyphsUnified_22"),
+			// (specter) RoR2's own tmpsprSwitchGlyphsUnified atlas. up/down are an unverified best
+			// guess - check with a real Switch controller and correct if the d-pad looks wrong.
+			["switch"] = ("tmpsprSwitchGlyphsUnified", "texSwitchGlyphsUnified_3", "texSwitchGlyphsUnified_5", "texSwitchGlyphsUnified_6", "texSwitchGlyphsUnified_7", "texSwitchGlyphsUnified_74", "texSwitchGlyphsUnified_12"),
+		};
+
+		/// <summary>
+		/// (specter) Shows a controller-family button glyph for Y/North, each A-button/South, and
+		/// LB/RB, matching RoR2's own art style. Keyboard has no icon atlas in RoR2 either
+		/// (Glyphs.RegisterKeyboard is empty upstream too), so it shows the real bound key text
+		/// instead, same as RoR2 does.
+		/// </summary>
+		private void UpdateInputGlyphs()
+		{
+			string deviceKey = GetDeviceKeyForCurrentController(_localPlayer);
+
+			// (specter) RoR2's own glyph registry doesn't distinguish 360 vs One (both register the
+			// same "tmpsprXboxOneGlyphs" sprite sheet) - only our own device-icon badge does.
+			string glyphKey = deviceKey == "xbox360" ? "xbox" : deviceKey;
+
+			if (GamepadGlyphs.TryGetValue(glyphKey, out var glyphs))
+			{
+				_yLabel.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.north}\">";
+				foreach (var label in _aButtonLabels)
+					label.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.confirm}\">";
+				_lbLabel.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.lb}\">";
+				_rbLabel.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.rb}\">";
+				foreach (var label in _upArrowLabels)
+					label.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.up}\">";
+				foreach (var label in _downArrowLabels)
+					label.text = $"<sprite=\"{glyphs.asset}\" name=\"{glyphs.down}\">";
+			}
+			else
+			{
+				// (specter) Keyboard: no icon atlas, so show the real bound key text (matches
+				// RoR2's own keyboard fallback behavior).
+				_yLabel.text = "Tab";
+				foreach (var label in _aButtonLabels)
+					label.text = "Enter";
+				_lbLabel.text = "Q";
+				_rbLabel.text = "E";
+				foreach (var label in _upArrowLabels)
+					label.text = "▲";
+				foreach (var label in _downArrowLabels)
+					label.text = "▼";
+			}
+
+			// (specter) Bumped up from the baked prefab sizes (9-15) - the configure menu's glyphs
+			// read as too small at their original text-sized dimensions.
+			_lbLabel.fontSize = 16;
+			_rbLabel.fontSize = 16;
+			foreach (var label in _aButtonLabels)
+				label.fontSize = 18;
+			foreach (var label in _upArrowLabels)
+				label.fontSize = 20;
+			foreach (var label in _downArrowLabels)
+				label.fontSize = 20;
+
+			// (specter) Reuse RoR2's own button color for the badge outlines instead of a guessed hex value.
+			var outlineColor = SplitscreenMenuController.RoR2ButtonColor;
+			_yOutline.effectColor = outlineColor;
+			foreach (var outline in _aButtonOutlines)
+				outline.effectColor = outlineColor;
+
+			ApplyRoR2Theme();
+		}
+
+		/// <summary>
+		/// (specter) Applies RoR2's real font, skipping its material since the shadow/underlay reads
+		/// as a gray haze at this size, and real button/text colors, matching the game's own panels.
+		/// </summary>
+		private void ApplyRoR2Theme()
+		{
+			if (_themeApplied || SplitscreenMenuController.RoR2Font == null)
+				return;
+			_themeApplied = true;
+
+			foreach (var tmp in GetComponentsInChildren<TextMeshProUGUI>(true))
+				tmp.font = SplitscreenMenuController.RoR2Font;
+
+			var buttonColor = SplitscreenMenuController.RoR2ButtonColor;
+			var collapsedImage = _collapsedRow.GetComponent<Image>();
+			collapsedImage.color = buttonColor;
+			AddBoxHighlight(collapsedImage.gameObject);
+
+			var expandedImage = _expandedContent.GetComponent<Image>() ?? _expandedContent.gameObject.AddComponent<Image>();
+			expandedImage.color = buttonColor;
+			expandedImage.raycastTarget = false;
+			AddBoxHighlight(expandedImage.gameObject);
+		}
+
+		/// <summary>
+		/// (specter) RoR2's own panels have a thin lighter border around their fill color - an
+		/// Outline component on a solid Image gives the same look, since its 4 diagonal shadow
+		/// copies only peek out past the un-shifted original at the edges.
+		/// </summary>
+		private static void AddBoxHighlight(GameObject target)
+		{
+			var outline = target.GetComponent<Outline>() ?? target.AddComponent<Outline>();
+			outline.effectColor = SplitscreenMenuController.RoR2MutedColor;
+			outline.effectDistance = new Vector2(1.5f, 1.5f);
+			outline.useGraphicAlpha = false;
 		}
 
 		/// <summary>
@@ -323,7 +667,7 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void UpdateInput()
 		{
-			Input.Update(LocalPlayer);
+			Input.Update(LocalPlayer, _options != null && _options.IsExpanded);
 		}
 
 		/// <summary>
@@ -335,6 +679,8 @@ namespace Dodad.XSplitscreen.Components
 			float alphaDirection = Time.deltaTime * 10f * (LocalPlayer != null && (Input.MouseActive || Input.Any) ? 1 : -1);
 			var newAlpha = Mathf.Clamp(currentColor.a + alphaDirection, MIN_DEVICE_ALPHA, 1f);
 			_deviceIcon.color = new Color(currentColor.r, currentColor.g, currentColor.b, newAlpha);
+
+			_accentStrip.color = MainColor; // (specter) reflects the player's chosen color
 		}
 
 		/// <summary>
@@ -343,6 +689,11 @@ namespace Dodad.XSplitscreen.Components
 		private void HandleDisplaySlotMovement()
 		{
 			if (IsKeyboardUser)
+				return;
+
+			// (specter) LB/RB switch tabs while the panel is open - don't also move the slot to
+			// another display.
+			if (_options.IsExpanded)
 				return;
 
 			int displayDirection = GetDisplayDirection();
@@ -419,7 +770,7 @@ namespace Dodad.XSplitscreen.Components
 			if (!LocalUserPanel.AllowChanges)
 				return;
 
-			if(!_options.IsEditing)
+			if (!_options.IsExpanded)
 			{
 				bool isKeyboard = IsKeyboardUser;
 
@@ -456,7 +807,6 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void ActivateOccupiedSlot()
 		{
-			_configuratorContainer.gameObject.SetActive(true);
 			ResolveDeviceIcon();
 			SetSlotUIState(true);
 			_options.OpenProfileConfigurator();
@@ -468,7 +818,9 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void HandleEmptySlot()
 		{
-			var siblings = Instances.Where(x => x.transform.parent == transform.parent);
+			// (specter) Compares by panel instead of direct parent, since slots now live in one of 2
+			// columns (LocalUserPanel.CreateColumn) and a parent check would only see one column's slots.
+			var siblings = Instances.Where(x => x._panel == _panel);
 			int instanceCount = siblings.Count();
 
 			bool hasOtherEmptySlot = siblings.Any(x => !(x == null) && x._localPlayer == null && x != this);
@@ -512,33 +864,41 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		/// <summary>
-		/// Set the UI state based on whether the slot is filled or empty.
+		/// (specter) Sets the UI state based on whether the slot is filled or empty. CollapsedRow
+		/// itself stays active either way (it hosts SlotOptions and the empty-state placeholder
+		/// text) - only its occupied-state children and the SlotOptions component itself toggle.
 		/// </summary>
 		private void SetSlotUIState(bool isOccupied)
 		{
-			_configuratorContainer.gameObject.SetActive(isOccupied);
 			_deviceIcon.enabled = isOccupied;
-			//_rightArrowImage.enabled = isOccupied;
-			//_leftArrowImage.enabled = isOccupied;
-			_titleContainer.gameObject.SetActive(!isOccupied);
+			// (specter) Disabling the Image just stops it rendering - its LayoutElement still
+			// reserved a real 35px slot on the left, pushing the empty-slot placeholder text off
+			// true-center. Pull it out of layout too when there's nothing to show.
+			if (_deviceIconLayout != null)
+				_deviceIconLayout.ignoreLayout = !isOccupied;
+			_accentStrip.gameObject.SetActive(isOccupied);
+			_nameText.gameObject.SetActive(isOccupied);
+			_readyCheck.SetActive(isOccupied && Profile != null);
+			_yToggleButton.gameObject.SetActive(isOccupied);
+			_yChevron.gameObject.SetActive(isOccupied); // (specter) "Configure" label - lives outside yToggle now, needs its own toggle
+			_configureSpacer.SetActive(isOccupied);
+			// (specter) Only needed to push Configure+glyph right while occupied - left active it'd
+			// split the empty slot's leftover space with TitleText 50/50, pushing the placeholder
+			// text off-center instead of letting it use the full width.
+			_genericSpacer.SetActive(isOccupied);
+			_titleTextGO.SetActive(!isOccupied);
+			_options.enabled = isOccupied;
 
-			bool isKeyboard = IsKeyboardUser;
-
-			_cancelButton.gameObject.SetActive(isKeyboard && isOccupied);
-			_confirmButton.gameObject.SetActive(isKeyboard && isOccupied);
-			_cancelImage.enabled = isOccupied;
-			_confirmImage.enabled = isOccupied;
-
-			if(!isOccupied)
+			if (!isOccupied)
 			{
 				OnRemovedKeyboardUser -= RefreshIfEmpty; // avoid duplicate subscriptions
+				_expandedContent.gameObject.SetActive(false);
 				OnRemovedKeyboardUser += RefreshIfEmpty;
 			}
 			else
 			{
 				OnRemovedKeyboardUser -= RefreshIfEmpty;
 			}
-
 		}
 
 		private void RefreshIfEmpty()
@@ -577,6 +937,8 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void ResolveDeviceIcon()
 		{
+			UpdateInputGlyphs();
+
 			string deviceKey = GetDeviceKeyForCurrentController(_localPlayer);
 
 			if (_deviceIcon.sprite != null && _deviceIcon.sprite.name == deviceKey)
@@ -597,22 +959,62 @@ namespace Dodad.XSplitscreen.Components
 			return GetDeviceKeyFromController(localPlayer.controllers.Controllers.First());
 		}
 
+		private static readonly HashSet<int> _loggedDeviceNames = new();
+
 		/// <summary>
-		/// Gets the device key from a controller type.
+		/// (specter) Gets the device key for a controller. Checks Rewired's hardware GUID first
+		/// (reliable regardless of what the OS/driver reports as the name), falling back to name
+		/// substring matching for an unidentified HID device.
 		/// </summary>
 		public static string GetDeviceKeyFromController(Controller controller)
 		{
 			if (controller == null)
 				return "x";
 
-			string controllerType = controller.name.ToString().ToLower();
-
-			if (controllerType.Contains("sony"))
-				return "ps";
-			else if (controller is Keyboard || controller is Mouse)
+			if (controller is Keyboard || controller is Mouse)
 				return "keyboard";
-			else
-				return "xbox";
+
+			if (controller is Joystick joystick)
+			{
+				var guid = joystick.hardwareTypeGuid;
+				if (guid == RoR2.DefaultControllerMaps.xbox360ControllerGuid) return "xbox360";
+				if (guid == RoR2.DefaultControllerMaps.xboneControllerGuid) return "xbox";
+				if (guid == RoR2.DefaultControllerMaps.PS4Guid) return "ps4";
+				if (guid == RoR2.DefaultControllerMaps.PS5Guid) return "ps5";
+				if (guid == RoR2.DefaultControllerMaps.switchProGuid
+					|| guid == RoR2.DefaultControllerMaps.switchDualGuid
+					|| guid == RoR2.DefaultControllerMaps.switchHandheldGuid) return "switch";
+			}
+
+			// (specter) `name` is often a generic driver label - also check `hardwareName`, and log
+			// unrecognized values so this matching can be tightened later.
+			string name = (controller.name ?? "").ToLower();
+			string hardwareName = (controller is Joystick j ? j.hardwareName : null)?.ToLower() ?? "";
+
+			if (!_loggedDeviceNames.Contains(controller.id))
+			{
+				_loggedDeviceNames.Add(controller.id);
+				Log.Print($"XSplitscreen device-icon diagnostic: controller.name='{controller.name}', hardwareName='{(controller is Joystick j2 ? j2.hardwareName : null)}', hardwareTypeGuid='{(controller is Joystick j3 ? j3.hardwareTypeGuid.ToString() : null)}'");
+			}
+
+			bool Has(string s, string term) => s.Contains(term);
+
+			if (Has(name, "dualsense") || Has(hardwareName, "dualsense") || Has(name, "ps5") || Has(hardwareName, "ps5"))
+				return "ps5";
+
+			if (Has(name, "sony") || Has(hardwareName, "sony") || Has(name, "dualshock") || Has(hardwareName, "dualshock")
+				|| Has(name, "playstation") || Has(hardwareName, "playstation") || Has(name, "ps4") || Has(hardwareName, "ps4")
+				|| Has(name, "wireless controller") || Has(hardwareName, "wireless controller"))
+				return "ps4";
+
+			if (Has(name, "360") || Has(hardwareName, "360"))
+				return "xbox360";
+
+			if (Has(name, "nintendo") || Has(hardwareName, "nintendo") || Has(name, "switch") || Has(hardwareName, "switch")
+				|| Has(name, "pro controller") || Has(hardwareName, "pro controller"))
+				return "switch";
+
+			return "xbox";
 		}
 
 		/// <summary>
@@ -644,11 +1046,11 @@ namespace Dodad.XSplitscreen.Components
 		public void SetMessage(string token)
 		{
 			if (token == null)
-				_titleContainer.gameObject.SetActive(false);
+				_titleTextGO.SetActive(false);
 			else
 			{
 				_titleController.token = token;
-				_titleContainer.gameObject.SetActive(true);
+				_titleTextGO.SetActive(true);
 			}
 		}
 
@@ -661,35 +1063,59 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		public class InputBank
 		{
+			/// <summary>
+			/// (specter) Rewired action IDs. 0/1 = analog stick, for continuous controls (cursor,
+			/// hue scrub). 12/13 = UIHorizontal/UIVertical, the d-pad signal on controllers with no
+			/// detectable Hat, for discrete steps. North/Y is RoR2's "Equipment" action.
+			/// </summary>
+			private const int UIHorizontalActionId = 12;
+			private const int UIVerticalActionId = 13;
+			private const int NorthButtonId = 6;
+
 			public bool Any { get; private set; }
 			public bool Left { get; private set; }
 			public bool Right { get; private set; }
 			public bool South { get; private set; }
 			public bool East { get; private set; }
+			public bool North { get; private set; }
 			public bool Up { get; private set; }
 			public bool Down { get; private set; }
 			public bool LB { get; private set; }
 			public bool RB { get; private set; }
+
+			/// <summary>
+			/// (specter) Raw (non-debounced) held state, for controls that need continuous scrub
+			/// (e.g. the color hue bar) rather than one discrete step per press.
+			/// </summary>
+			public bool LeftHeld { get; private set; }
+			public bool RightHeld { get; private set; }
+
 			public float LeftRightDelta { get; private set; }
 			public float UpDownDelta { get; private set; }
 			public bool MouseLeft { get; private set; }
 			public bool MouseActive { get; private set; }
 
 			private float pressDelay = 0.3f;
-			private float leftTimer, rightTimer, southTimer, eastTimer, upTimer, downTimer, lbTimer, rbTimer;
+			private float leftTimer, rightTimer, southTimer, eastTimer, northTimer, upTimer, downTimer, lbTimer, rbTimer;
 
 			/// <summary>
 			/// Updates the input bank, debouncing input events.
 			/// </summary>
-			public void Update(Player player)
+			/// <param name="panelExpanded">
+			/// (specter) Whether this slot's settings panel is open - gamepad uses the d-pad to
+			/// browse/adjust values while open, and the stick otherwise.
+			/// </param>
+			public void Update(Player player, bool panelExpanded = false)
 			{
-				Any = Left = Right = South = East = Up = Down = LB = RB = MouseLeft = MouseActive = false;
+				Any = Left = Right = South = East = North = Up = Down = LB = RB = MouseLeft = MouseActive = false;
+				LeftHeld = RightHeld = false;
 				LeftRightDelta = UpDownDelta = 0f;
 
 				leftTimer -= Time.deltaTime;
 				rightTimer -= Time.deltaTime;
 				southTimer -= Time.deltaTime;
 				eastTimer -= Time.deltaTime;
+				northTimer -= Time.deltaTime;
 				upTimer -= Time.deltaTime;
 				downTimer -= Time.deltaTime;
 				lbTimer -= Time.deltaTime;
@@ -697,20 +1123,45 @@ namespace Dodad.XSplitscreen.Components
 
 				if (player == null) return;
 
+				// (specter) Analog stick - drives continuous controls (cursor, hue scrub).
 				LeftRightDelta = player.GetAxis(RewiredConsts.Action.MoveHorizontal);
 				UpDownDelta = player.GetAxis(RewiredConsts.Action.MoveVertical);
 
+				// (specter) D-pad discrete steps (see class doc comment for why UIHorizontal/Vertical).
+				float dpadHorizontal = player.GetAxis(UIHorizontalActionId);
+				float dpadVertical = player.GetAxis(UIVerticalActionId);
+
+				// (specter) UIHorizontal/Vertical also fires from the analog stick on some
+				// controllers (confirmed on a DS4), which defeats the point of separating d-pad
+				// from stick input. Read the Hat directly when the controller has one - that's
+				// tied to the physical d-pad switch only.
+				if (player.controllers.Joysticks.Count > 0)
+				{
+					var joystick = player.controllers.Joysticks[0];
+					if (joystick.hatCount > 0)
+					{
+						var hat = joystick.Hats[0];
+						dpadHorizontal = hat.buttonRight.value ? 1f : (hat.buttonLeft.value ? -1f : 0f);
+						dpadVertical = hat.buttonUp.value ? 1f : (hat.buttonDown.value ? -1f : 0f);
+					}
+				}
+
 				bool southValue = player.GetButtonDown(RewiredConsts.Action.UISubmit);
 				bool eastValue = player.GetButtonDown(RewiredConsts.Action.UICancel);
+				bool northValue = player.GetButtonDown(NorthButtonId);
 				bool lbValue = player.GetButtonDown(RewiredConsts.Action.UITabLeft);
 				bool rbValue = player.GetButtonDown(RewiredConsts.Action.UITabRight);
-;
+
 				if (player.controllers.hasKeyboard)
 				{
-					/*LeftRightDelta +=
+					// (specter) Keyboard scheme: Tab opens/closes the panel, Q/E switch tabs, Up/Down
+					// browse values (Profile/Trails), Left/Right scrub the hue (Color), Enter
+					// confirms, Escape cancels/closes. Arrow keys are no longer double-booked as
+					// confirm/cancel.
+					LeftRightDelta +=
 						(player.controllers.Keyboard.GetKey(KeyCode.LeftArrow) ? -1 : 0)
 						+
-						(player.controllers.Keyboard.GetKey(KeyCode.RightArrow) ? 1 : 0);*/
+						(player.controllers.Keyboard.GetKey(KeyCode.RightArrow) ? 1 : 0);
 
 					UpDownDelta +=
 						(player.controllers.Keyboard.GetKey(KeyCode.DownArrow) ? -1 : 0)
@@ -723,35 +1174,43 @@ namespace Dodad.XSplitscreen.Components
 					if (scrollDelta != 0)
 						upTimer = downTimer = 0;
 
-					/*southValue |= player.controllers.Keyboard.GetKey(KeyCode.Space) | player.controllers.Keyboard.GetKey(KeyCode.KeypadEnter);
-					eastValue |= player.controllers.Keyboard.GetKey(KeyCode.Escape) | player.controllers.Keyboard.GetKey(KeyCode.Backspace);*/
-					southValue |= player.controllers.Keyboard.GetKey(KeyCode.RightArrow);
-					eastValue |= player.controllers.Keyboard.GetKey(KeyCode.LeftArrow);
+					southValue |= player.controllers.Keyboard.GetKey(KeyCode.Return) || player.controllers.Keyboard.GetKey(KeyCode.KeypadEnter);
+					eastValue |= player.controllers.Keyboard.GetKey(KeyCode.Escape);
+					northValue |= player.controllers.Keyboard.GetKeyDown(KeyCode.Tab);
+					lbValue |= player.controllers.Keyboard.GetKeyDown(KeyCode.Q);
+					rbValue |= player.controllers.Keyboard.GetKeyDown(KeyCode.E);
 
 					MouseLeft = player.controllers.Mouse.GetButton(0);
 					MouseActive = new Vector2(LeftRightDelta, UpDownDelta).sqrMagnitude > 0.1f;
-
-					// Keyboard user on alternate monitor not supported for now
-					/*lbValue |= player.controllers.Keyboard.GetKey(KeyCode.Q);
-					rbValue |= player.controllers.Keyboard.GetKey(KeyCode.E);*/
 				}
 
-				if (leftTimer <= 0 && LeftRightDelta < -0.3f)
+				// (specter) Gamepad uses the d-pad while a panel is open, the stick otherwise.
+				// Keyboard always uses arrow keys (already folded into LeftRightDelta/UpDownDelta above).
+				bool useStick = player.controllers.hasKeyboard || !panelExpanded;
+				float navHorizontal = useStick ? LeftRightDelta : dpadHorizontal;
+				float navVertical = useStick ? UpDownDelta : dpadVertical;
+
+				// (specter) Uses navHorizontal instead of the raw stick, to keep ColorConfigurator's
+				// hue-scrub on the d-pad while a panel is open, same as Left/Right below.
+				LeftHeld = navHorizontal < -0.3f;
+				RightHeld = navHorizontal > 0.3f;
+
+				if (leftTimer <= 0 && navHorizontal < -0.3f)
 				{
 					Left = true;
 					leftTimer = pressDelay;
 				}
-				if (rightTimer <= 0 && LeftRightDelta > 0.3f)
+				if (rightTimer <= 0 && navHorizontal > 0.3f)
 				{
 					Right = true;
 					rightTimer = pressDelay;
 				}
-				if (upTimer <= 0 && UpDownDelta > 0.3f)
+				if (upTimer <= 0 && navVertical > 0.3f)
 				{
 					Up = true;
 					upTimer = pressDelay;
 				}
-				if (downTimer <= 0 && UpDownDelta < -0.3f)
+				if (downTimer <= 0 && navVertical < -0.3f)
 				{
 					Down = true;
 					downTimer = pressDelay;
@@ -765,6 +1224,11 @@ namespace Dodad.XSplitscreen.Components
 				{
 					East = true;
 					eastTimer = pressDelay;
+				}
+				if (northTimer <= 0 && northValue)
+				{
+					North = true;
+					northTimer = pressDelay;
 				}
 				if (lbTimer <= 0 && lbValue)
 				{

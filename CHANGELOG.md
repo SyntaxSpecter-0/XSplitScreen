@@ -1,3 +1,36 @@
+**4.1.2**
+
+- Redesigned the player configuration panel (profile, color, and trails tabs) by SyntaxSpecter
+- Controller button prompts now show the correct glyph for the connected gamepad (Xbox/PlayStation)
+- Updated README screenshots and gifs to match the new UI
+
+**4.0.9**
+
+- Fixed the UI becoming deactivated when the DLC is missing
+
+**4.0.8**
+
+- Updated credits
+
+**4.0.7**
+
+- Added local multiplayer pause support
+- Changed how extra main menu buttons are removed, to avoid conflicts with buttons added by R2API
+
+**4.0.6**
+
+- Added a Game Mode selector to the splitscreen menu, so the chosen mode is used when launching
+- Reworked how multiplayer player colors are applied, fixing a conflict with other mods that also patch player colors
+
+**4.0.5**
+
+- Added gamemode selection to the XSplitScreen menu
+
+**4.0.3**
+
+- Fixed a startup crash caused by a RoR2 UI API change (`Nameplate.SetBody` was replaced with `Initialize`)
+- Fixed a disappearing cursor bug
+
 **4.0.1**
 
 - Made swapping between multiple displays easier

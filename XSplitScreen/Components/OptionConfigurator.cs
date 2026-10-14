@@ -53,6 +53,13 @@ namespace Dodad.XSplitscreen.Components
 		public SlotOptions Options;
 
 		/// <summary>
+		/// (specter) Whether this configurator's current value has been locked in via A (gamepad
+		/// flow only - see SlotOptions). Drives the checkmark badge on the tab strip. Configurators
+		/// should set this true when confirming and false whenever the value is changed again.
+		/// </summary>
+		public bool IsConfirmed;
+
+		/// <summary>
 		/// Invoked when the user is finished editing this option.
 		/// </summary>
 		public Action OnFinished;
@@ -62,12 +69,6 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		/// <param name="direction">Direction (-1 for left, 1 for right)</param>
 		public abstract void OnNavigate(int direction);
-
-		/// <summary>
-		/// Handles navigation input from mouse click
-		/// </summary>
-		/// <param name="direction"></param>
-		public abstract void OnNavigateIndex(int index);
 
 		/// <summary>
 		/// Handles navigation input from mouse.

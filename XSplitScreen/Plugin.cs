@@ -28,7 +28,7 @@ namespace Dodad.XSplitscreen
 		public const string PluginGUID = PluginAuthor + "." + PluginName;
 		public const string PluginAuthor = "com.dodad";
 		public const string PluginName = "XSplitscreen";
-		public const string PluginVersion = "4.0.9";
+		public const string PluginVersion = "4.1.2";
 
 		public const int HardMaxPlayers = 16;
 
@@ -619,6 +619,10 @@ namespace Dodad.XSplitscreen
 
                 var menuController = menu.transform.Find("Splitscreen Menu");
 
+				// (specter) Scoped to Main Panel instead of the whole canvas, since Notification/Credits
+				// Panel rely on seeing through to whatever's behind the canvas at their edges.
+				SetupAmbientBackground(menuController.Find("Main Panel"));
+
 				var canvas = menuController.gameObject.GetComponent<Canvas>();
                 canvas.targetDisplay = id;
 
@@ -646,7 +650,30 @@ namespace Dodad.XSplitscreen
                 return null;
 			}
 		}
-		
+
+		/// <summary>
+		/// (specter) Adds an opaque #060606 backdrop plus drifting dots behind everything else in Main Panel.
+		/// </summary>
+		private static void SetupAmbientBackground(Transform mainPanel)
+		{
+			if (mainPanel == null) return;
+
+			var bg = new GameObject("BG", typeof(RectTransform), typeof(CanvasRenderer), typeof(UnityEngine.UI.Image));
+			var bgRect = (RectTransform) bg.transform;
+			bgRect.SetParent(mainPanel, false);
+			bgRect.SetAsFirstSibling();
+			bgRect.anchorMin = Vector2.zero;
+			bgRect.anchorMax = Vector2.one;
+			bgRect.sizeDelta = Vector2.zero;
+			bgRect.anchoredPosition = Vector2.zero;
+
+			var bgImage = bg.GetComponent<UnityEngine.UI.Image>();
+			bgImage.color = new Color(6f / 255f, 6f / 255f, 6f / 255f, 1f);
+			bgImage.raycastTarget = false;
+
+			bg.AddComponent<AmbientBackground>();
+		}
+
 		#endregion
 
 		//-----------------------------------------------------------------------------------------------------------
