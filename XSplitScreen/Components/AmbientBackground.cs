@@ -12,8 +12,8 @@ namespace Dodad.XSplitscreen.Components
 	{
 		private static readonly Color[] Palette =
 		{
-			new Color(0.42f, 0.24f, 0.40f), // (specter) #6a3c66 - mockup's purple dot
-			new Color(0.18f, 0.42f, 0.45f), // (specter) #2e6b74 - mockup's teal dot
+			new Color(0.42f, 0.24f, 0.40f), // (specter) #6a3c66 - purple dot
+			new Color(0.18f, 0.42f, 0.45f), // (specter) #2e6b74 - teal dot
 			new Color(0.30f, 0.20f, 0.45f),
 			new Color(0.15f, 0.30f, 0.40f),
 		};
