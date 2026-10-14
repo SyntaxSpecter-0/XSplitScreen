@@ -41,26 +41,6 @@ namespace Dodad.XSplitscreen.Components
 			_maxY = transform.parent.GetComponent<RectTransform>().rect.height / 2f;
 		}
 
-		// (specter) Any player can close the credits - a non-host controller could open them but
-		// never close them when only MainInput was checked.
-		private static bool AnyCloseInputPressed()
-		{
-			if (SplitscreenMenuController.MainInput != null &&
-				(SplitscreenMenuController.MainInput.MouseLeft || SplitscreenMenuController.MainInput.East || SplitscreenMenuController.MainInput.South))
-				return true;
-
-			if (LocalUserSlot.Instances != null)
-			{
-				foreach (var slot in LocalUserSlot.Instances)
-				{
-					if (slot != null && slot.Input != null && (slot.Input.East || slot.Input.South))
-						return true;
-				}
-			}
-
-			return false;
-		}
-
 		private void Update()
 		{
 			if (ShowCredits && AnyCloseInputPressed())
@@ -91,6 +71,26 @@ namespace Dodad.XSplitscreen.Components
 		private void InitializeReferences()
 		{
 			_group = GetComponent<CanvasGroup>();
+		}
+
+		// (specter) Check every slot's input in addition to SplitscreenMenuController.MainInput,
+		// since a non-host controller could otherwise open credits but never close them.
+		private static bool AnyCloseInputPressed()
+		{
+			if (SplitscreenMenuController.MainInput != null &&
+				(SplitscreenMenuController.MainInput.MouseLeft || SplitscreenMenuController.MainInput.East || SplitscreenMenuController.MainInput.South))
+				return true;
+
+			if (LocalUserSlot.Instances != null)
+			{
+				foreach (var slot in LocalUserSlot.Instances)
+				{
+					if (slot != null && slot.Input != null && (slot.Input.East || slot.Input.South))
+						return true;
+				}
+			}
+
+			return false;
 		}
 
 		private void InitializeRollerPrefab()
@@ -196,8 +196,9 @@ namespace Dodad.XSplitscreen.Components
 		private void InitializeContributors()
 		{
 			AddContributor("Creator", "dodad");
-			AddContributor("Art", "Claymaver (https://linktr.ee/claymaver)");
+			AddContributor("Art", "SyntaxSpecter");
 			AddContributor("Art", "dodad");
+			AddContributor("Programming", "SyntaxSpecter");
 			AddContributor("Programming", "Narl");
 			AddContributor("Programming", "AncientHeroX");
 			AddContributor("Programming", "pokedex4848");

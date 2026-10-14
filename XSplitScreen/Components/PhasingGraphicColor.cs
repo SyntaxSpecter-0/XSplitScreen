@@ -29,6 +29,12 @@ namespace Dodad.XSplitscreen.Components
 				Destroy(this);
 			}
 
+			// (specter) Prefab-reconstruction (ComponentUtility copy/paste when recovering this
+			// component from the shipped AssetBundle) can leave a serialized List<T> field null
+			// instead of its compile-time default, so guard rather than assume it survived intact.
+			if (phaseColors == null || phaseColors.Count == 0)
+				phaseColors = new List<Color> { Color.yellow, Color.red };
+
 			phasePosition = phaseOffset * (phaseColors.Count - 1);
 		}
 

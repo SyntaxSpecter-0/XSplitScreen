@@ -1,36 +1,107 @@
 ManifestFileVersion: 0
-CRC: 52247701
+CRC: 2025562339
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: 7c884e4f750a86fb1c08672d05eea953
+    Hash: 573d4b0364dcbf63d74cf3c8fe15f080
   TypeTreeHash:
     serializedVersion: 2
-    Hash: c90fc19e2679e5295d10bd00f33cb4c3
+    Hash: 31befffbb321e8e772fbcb8095a4d47d
 HashAppended: 0
 ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
 - Class: 28
+  Script: {instanceID: 0}
+- Class: 114
+  Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 86710e43de46f6f4bac7c8e50813a599, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 1aa08ab6e0800fa44ae55d278d1423e3, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+- Class: 115
   Script: {instanceID: 0}
 - Class: 213
   Script: {instanceID: 0}
+- Class: 222
+  Script: {instanceID: 0}
+- Class: 223
+  Script: {instanceID: 0}
+- Class: 224
+  Script: {instanceID: 0}
+- Class: 225
+  Script: {instanceID: 0}
 SerializeReferenceClassIdentifiers: []
 Assets:
-- Assets/DoDad/Textures/lemon.png
-- Assets/DoDad/Textures/monitor.png
-- Assets/DoDad/Textures/dot.png
-- Assets/DoDad/Textures/display_center.png
-- Assets/DoDad/Textures/gear.png
-- Assets/DoDad/Textures/lock.png
-- Assets/DoDad/Textures/crosshair.png
-- Assets/DoDad/Textures/warning.png
-- Assets/DoDad/Textures/xmark.png
-- Assets/DoDad/Textures/reset.png
-- Assets/DoDad/Textures/unknown.png
-- Assets/DoDad/Textures/plus.png
-- Assets/DoDad/Textures/display.png
-- Assets/DoDad/Textures/display_screen.png
-- Assets/DoDad/Textures/divider.png
-- Assets/DoDad/Textures/keyboardmouse.png
-- Assets/DoDad/Textures/xinput.png
-- Assets/DoDad/Textures/dinput.png
+- Assets/XSplitScreen/RealPrefabs/userslot.prefab
+- Assets/XSplitScreen/Textures/display_screen_vertical.png
+- Assets/XSplitScreen/Textures/device_xbox.png
+- Assets/XSplitScreen/Textures/purplegradient_01.png
+- Assets/XSplitScreen/Textures/heart_02.png
+- Assets/XSplitScreen/Textures/button_lb.png
+- Assets/XSplitScreen/Textures/unknown.png
+- Assets/XSplitScreen/Materials/ParticleMat_A.mat
+- Assets/XSplitScreen/Textures/split.png
+- Assets/XSplitScreen/Textures/divider.png
+- Assets/XSplitScreen/Textures/device_x.png
+- Assets/XSplitScreen/Textures/purplesmoke_01.png
+- Assets/XSplitScreen/Textures/device_switch.png
+- Assets/XSplitScreen/Textures/device_ps5.png
+- Assets/XSplitScreen/Textures/lemon.png
+- Assets/XSplitScreen/Textures/heart_01.png
+- Assets/XSplitScreen/Textures/display_old.png
+- Assets/XSplitScreen/Textures/device_keyboard.png
+- Assets/XSplitScreen/Textures/checkmark_2.png
+- Assets/XSplitScreen/Textures/device_ps4.png
+- Assets/XSplitScreen/Textures/display_screen_corner.png
+- Assets/XSplitScreen/RealPrefabs/menu.prefab
+- Assets/XSplitScreen/Textures/arrow.png
+- Assets/XSplitScreen/Textures/skull_01.png
+- Assets/XSplitScreen/Textures/device_xbox360.png
+- Assets/XSplitScreen/Textures/checkmark.png
+- Assets/XSplitScreen/Textures/lock.png
+- Assets/XSplitScreen/Textures/dot.png
+- Assets/XSplitScreen/Textures/monitor.png
+- Assets/XSplitScreen/Textures/flare_02.png
+- Assets/XSplitScreen/Textures/display.png
+- Assets/XSplitScreen/Textures/crosshair.png
+- Assets/XSplitScreen/Textures/shift.png
+- Assets/XSplitScreen/Textures/border.png
+- Assets/XSplitScreen/Textures/display_screen_horizontal.png
+- Assets/XSplitScreen/Textures/gear.png
+- Assets/XSplitScreen/Textures/display_center.png
+- Assets/XSplitScreen/Textures/reset.png
+- Assets/XSplitScreen/Textures/display_divider.png
+- Assets/XSplitScreen/Textures/button_a.png
+- Assets/XSplitScreen/RealPrefabs/rollerprefab.prefab
+- Assets/XSplitScreen/Textures/warning.png
+- Assets/XSplitScreen/Textures/plus.png
+- Assets/XSplitScreen/Textures/fx_flare_3.png
+- Assets/XSplitScreen/Textures/display_screen.png
+- Assets/XSplitScreen/Textures/cancel.png
+- Assets/XSplitScreen/Textures/keyboard.png
+- Assets/XSplitScreen/Textures/button_rb.png
+- Assets/XSplitScreen/Textures/button_y.png
+- Assets/XSplitScreen/Textures/mouse.png
+- Assets/XSplitScreen/RealPrefabs/assignment.prefab
 Dependencies: []

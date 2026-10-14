@@ -16,43 +16,42 @@ namespace Dodad.XSplitscreen.Components
 		private ColorSettingsModule _colorModule;
 		private RectTransform _hueGradient;
 		private RectTransform _indicator;
-		private Image _indicatorImage;
+		private Image _swatch;
 
 		private float _indicatorPosition = 0.5f;
 
 		private Coroutine _dragIndicatorRoutine;
 
+		private bool _uiResolved;
+
 		public override string GetName() => "XSS_CONFIG_COLOR";
-
-		public void Awake()
-		{
-			EnableCancelButton = true;
-			EnableConfirmButton = true;
-			NavigatorCount = 0;
-
-			CreateUI();
-		}
 
 		/// <summary>
 		/// Updates the configurator based on input.
 		/// </summary>
 		public override void ConfiguratorUpdate()
 		{
-			if (Mathf.Abs(Options.Slot.Input.LeftRightDelta) > 0.1f)
+			// (specter) Left/Right on the d-pad scrubs the hue bar continuously while held, rather
+			// than requiring analog stick precision - matches how a mouse-drag already works here.
+			if (Options.Slot.Input.LeftHeld)
 			{
-				UpdateSelection(Options.Slot.Input.LeftRightDelta);
+				IsConfirmed = false;
+				UpdateSelection(-1f);
 				UpdateSelectedColor();
 			}
-			else
+			else if (Options.Slot.Input.RightHeld)
 			{
-				if (Options.Slot.Input.South)
-				{
-					OnConfirm();
-				}
-				else if(Options.Slot.Input.East)
-				{
-					OnCancel();
-				}
+				IsConfirmed = false;
+				UpdateSelection(1f);
+				UpdateSelectedColor();
+			}
+			else if (Options.Slot.Input.South)
+			{
+				OnConfirm();
+			}
+			else if (Options.Slot.Input.East)
+			{
+				OnCancel();
 			}
 
 			UpdateIndicatorPosition();
@@ -62,36 +61,31 @@ namespace Dodad.XSplitscreen.Components
 
 		public override void Open()
 		{
-			Options.SetMessage(null);
+			ResolveUI();
 
-			SetSelectionState(0);
+			IsConfirmed = true; // (specter) a color is always set; nudging clears this, A/confirm re-sets it
 		}
 
 		public override void ForceClose()
 		{
 			StopDragRoutine();
-			SetSelectionUIVisibility(-1);
 		}
 
-		public override void OnNavigate(int direction)
-		{
-			CycleSelectionState(direction);
-		}
-
-		public override void OnNavigateIndex(int direction)
-		{
-			SetSelectionState(direction);
-		}
+		// (specter) The redesigned ColorContent panel is a single hue-scrub row (no separate
+		// selection states) - Up/Down navigation no longer applies here.
+		public override void OnNavigate(int direction) { }
 
 		public override void OnCancel()
 		{
-			SaveAndClose();
+			// (specter) Gamepad: East no longer closes the panel here (only North/Y does) - the
+			// color already saves live as it's scrubbed, so there's nothing left to revert.
+			if (Options.Slot.IsKeyboardUser)
+				SaveAndClose();
 		}
 
 		public override void OnConfirm()
 		{
-			SaveAndClose();
-			//CycleSelectionState(1);
+			IsConfirmed = true;
 		}
 
 		public override void OnLoadProfile()
@@ -101,14 +95,14 @@ namespace Dodad.XSplitscreen.Components
 
 		private void SaveAndClose()
 		{
-			SetSelectionUIVisibility(-1);
-
 			StopDragRoutine();
 			OnFinished();
 		}
 
 		private void LoadColor()
 		{
+			ResolveUI();
+
 			_colorModule = null;
 
 			if (Options.Slot.Profile != null)
@@ -144,6 +138,9 @@ namespace Dodad.XSplitscreen.Components
 
 			Options.Slot.MainColor = color;
 
+			if (_swatch != null)
+				_swatch.color = color;
+
 			if (markDirty)
 				SaveColor();
 		}
@@ -169,10 +166,8 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		/// <summary>
-		/// Get the indicator position by comparing the provided color to the gradient
+		/// (specter) Gets the gradient index matching a color, or 0 if not found.
 		/// </summary>
-		/// <param name="color">The gradient index or 0 if not found</param>
-		/// <returns></returns>
 		private int GetIndicatorIndexFromColor(Color color)
 		{
 			for(int e = 0; e < 256; e++)
@@ -184,29 +179,6 @@ namespace Dodad.XSplitscreen.Components
 			}
 
 			return 0;
-		}
-
-		private void CycleSelectionState(int state) => SetSelectionState(state + NavigatorIndex);
-
-		/// <summary>
-		/// Updates the selection state to the desired index.
-		/// </summary>
-		/// <param name="index">-1 to cycle back, 1 to cycle forward</param>
-		private void SetSelectionState(int index)
-		{
-			NavigatorIndex = Mathf.Clamp(index, 0, NavigatorCount);
-
-			SetSelectionUIVisibility(NavigatorIndex);
-		}
-
-		/// <summary>
-		/// Set the various UI visibility states based on the index
-		/// </summary>
-		/// <param name="index">-1 = all off, > -1 = indicator on -- 0 = color</param>
-		private void SetSelectionUIVisibility(int index)
-		{
-			_indicator.gameObject.SetActive(index > -1);
-			_hueGradient.gameObject.SetActive(index == 0);
 		}
 
 		private void StartDragRoutine()
@@ -244,47 +216,38 @@ namespace Dodad.XSplitscreen.Components
 			cleanup?.Invoke();
 		}
 
-		private void CreateUI()
+		/// <summary>
+		/// (specter) Wires up to the pre-built ColorContent elements. Resolved lazily on the first
+		/// Open() instead of Awake(), since Options isn't assigned until just after Awake() runs.
+		/// </summary>
+		private void ResolveUI()
 		{
+			if (_uiResolved) return;
+			_uiResolved = true;
+
 			if (Hue == null)
 			{
 				Hue = GenerateColorSpectrumGradient(256, 1);
 				ColorSlice = Hue.GetPixels(0, 0, 256, 1);
 			}
 
-			_hueGradient = new GameObject("ColorGradient", typeof(RectTransform)).GetComponent<RectTransform>();
-			_hueGradient.gameObject.AddComponent<Image>().sprite = Sprite.Create(Hue, new Rect(0, 0, 256, 1), new Vector2(0.5f, 0.5f));
-			_hueGradient.SetParent(transform);
-			_hueGradient.localPosition = Vector3.zero;
-			_hueGradient.localScale = Vector3.one;
-			_hueGradient.anchorMin = new Vector2(0, 0.45f);
-			_hueGradient.anchorMax = new Vector2(1, 0.55f);
-			_hueGradient.sizeDelta = Vector2.zero;
+			var colorContent = Options.Slot.transform.Find("ExpandedContent/ColorContent");
+
+			_hueGradient = (RectTransform) colorContent.Find("HueRow/HueBarContainer");
+			_hueGradient.GetComponent<Image>().sprite = Sprite.Create(Hue, new Rect(0, 0, 256, 1), new Vector2(0.5f, 0.5f));
 			var colorButton = _hueGradient.gameObject.AddComponent<MPButton>();
 			colorButton.onSelect = new UnityEngine.Events.UnityEvent();
 			colorButton.onSelect.AddListener(() => StartDragRoutine());
 			colorButton.allowAllEventSystems = true;
-			_hueGradient.gameObject.SetActive(false);
 
-			_indicator = new GameObject("Indicator", typeof(RectTransform)).GetComponent<RectTransform>();
-			_indicatorImage = _indicator.gameObject.AddComponent<Image>();
-			_indicatorImage.sprite = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, Texture2D.whiteTexture.width, Texture2D.whiteTexture.height), new Vector2(0.5f, 0.5f));
-			_indicatorImage.raycastTarget = false;
-			_indicator.SetParent(transform);
-			_indicator.localPosition = Vector3.zero;
-			_indicator.localScale = Vector3.one;
-			_indicator.anchorMin = new Vector2(0.5f, 0.4f);
-			_indicator.anchorMax = new Vector2(0.5f, 0.6f);
-			_indicator.sizeDelta = new Vector2(3f, 0f);
-			_indicator.gameObject.SetActive(false);
+			_indicator = (RectTransform) _hueGradient.Find("Indicator");
+
+			_swatch = colorContent.Find("SwatchRow/Swatch").GetComponent<Image>();
 		}
 
 		/// <summary>
-		/// Generates a horizontal texture with the full color spectrum.
+		/// (specter) Generates a horizontal full-spectrum hue gradient texture.
 		/// </summary>
-		/// <param name="width">Width of the texture.</param>
-		/// <param name="height">Height of the texture.</param>
-		/// <returns>A Texture2D with the color spectrum gradient.</returns>
 		public static Texture2D GenerateColorSpectrumGradient(int width, int height)
 		{
 			Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
@@ -307,40 +270,26 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		/// <summary>
-		/// Returns a float in the range [0,1] indicating the normalized horizontal position of the cursor over the RectTransform.
-		/// 0 = left of rect (or outside to the left)
-		/// 1 = right of rect (or outside to the right)
-		/// 0.5 = center
-		/// Vertical position is ignored.
+		/// (specter) Normalized horizontal cursor position over the RectTransform (0 = left, 1 = right).
 		/// </summary>
 		public static float GetCursorHorizontalNormalized(RectTransform rectTransform, Camera uiCamera = null)
 		{
-			// Get mouse position in screen space
 			Vector2 mouseScreenPos = Input.mousePosition;
 
-			// Convert mouse position to local position in the RectTransform's space
 			Vector2 localPoint;
 			if (RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, mouseScreenPos, uiCamera, out localPoint))
 			{
-				// rectTransform.rect contains the local-space rect (centered at pivot)
 				float left = rectTransform.rect.xMin;
 				float right = rectTransform.rect.xMax;
 
-				// Clamp localPoint.x between left and right
-				float clampedX = Mathf.Clamp(localPoint.x, left, right);
-
-				// Normalize: 0 at left, 1 at right
-				float normalized = (clampedX - left) / (right - left);
-
-				// If cursor is outside, forcibly return 0 or 1
 				if (localPoint.x <= left)
 					return 0f;
 				if (localPoint.x >= right)
 					return 1f;
 
-				return normalized;
+				return (Mathf.Clamp(localPoint.x, left, right) - left) / (right - left);
 			}
-			// If cannot convert, return 0 (e.g. if rectTransform not on screen)
+
 			return 0f;
 		}
 	}
