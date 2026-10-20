@@ -217,6 +217,15 @@ namespace Dodad.XSplitscreen.Components
 			}
 		}
 
+		// (specter) Claiming a screen counts as picking the profile the player is looking at
+		internal void ConfirmHighlighted()
+		{
+			if (!_isOpen)
+				OnProfileSelected();
+
+			OnConfirm();
+		}
+
 		/// <summary>
 		/// Handles navigation input from the user interface.
 		/// </summary>
