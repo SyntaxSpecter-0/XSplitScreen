@@ -976,6 +976,11 @@ namespace Dodad.XSplitscreen.Components
 
 			if (controller is Joystick joystick)
 			{
+				// (specter) Over raw input Rewired treats a DualSense as a DualShock 4. Its product id
+				// in the identifier (0CE6, or 0DF2 for the Edge) tells them apart.
+				string identifier = joystick.hardwareIdentifier?.ToLower() ?? "";
+				if (identifier.Contains("0ce6054c") || identifier.Contains("0df2054c")) return "ps5";
+
 				var guid = joystick.hardwareTypeGuid;
 				if (guid == RoR2.DefaultControllerMaps.xbox360ControllerGuid) return "xbox360";
 				if (guid == RoR2.DefaultControllerMaps.xboneControllerGuid) return "xbox";
