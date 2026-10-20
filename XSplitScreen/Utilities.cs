@@ -43,54 +43,46 @@ namespace Dodad.XSplitscreen
 		/// </summary>
 		public static class Hovercast
 		{
+			private static readonly List<Selectable> selectables = new List<Selectable>();
+
 			/// <summary>
-			/// Returns the first Selectable under the virtual cursor within the container hierarchy.
-			/// If none is found, returns null.
+			/// Returns the topmost interactable Selectable under the virtual cursor within the container, or null.
 			/// </summary>
-			/// <param name="container">The RectTransform containing the UI elements.</param>
-			/// <param name="virtualCursor">The RectTransform representing the cursor.</param>
-			/// <returns>The first Selectable being hovered by the cursor, or null.</returns>
 			public static Selectable GetSelectableUnderCursor(RectTransform container, RectTransform virtualCursor)
 			{
 				if (container == null || virtualCursor == null)
 					return null;
 
-				// Get cursor position in world space
-				Vector3 cursorWorldPos = virtualCursor.position;
+				// (specter) Checks every Selectable directly. Layout groups let buttons overflow their parent's rect
+				// (the Game Mode and Credits buttons do), so walking down through parent rects missed them.
+				container.GetComponentsInChildren(false, selectables);
 
-				// Recursively search for selectable under cursor
-				return FindSelectableRecursive(container, cursorWorldPos);
-			}
+				Selectable hovered = null;
 
-			private static Selectable FindSelectableRecursive(RectTransform parent, Vector3 cursorWorldPos)
-			{
-				// Traverse children in reverse order for topmost first
-				for (int i = parent.childCount - 1; i >= 0; i--)
+				// Later in the hierarchy draws on top, and a carousel's arrow buttons come after the carousel itself
+				for (int i = selectables.Count - 1; i >= 0; i--)
 				{
-					var child = parent.GetChild(i) as RectTransform;
-					if (child == null || !child.gameObject.activeInHierarchy)
+					var selectable = selectables[i];
+					var rect = (RectTransform) selectable.transform;
+
+					if (!selectable.IsInteractable() || !Contains(rect, virtualCursor.position))
 						continue;
 
-					// Convert cursor position to child's local space
-					Vector2 localPoint = child.InverseTransformPoint(cursorWorldPos);
-
-					if (child.rect.Contains(localPoint))
+					// Skip buttons scrolled out of view in a masked list
+					var mask = selectable.GetComponentInParent<RectMask2D>();
+					if (mask == null || Contains(mask.rectTransform, virtualCursor.position))
 					{
-						// (specter) Traverse nested children first - CarouselController carries its own
-						// Selectable on the same object that also parents its arrow buttons, so checking
-						// the outer one first would make the arrows unreachable.
-						var nested = FindSelectableRecursive(child, cursorWorldPos);
-						if (nested != null)
-							return nested;
-
-						// (specter) Fall back to this child's own Selectable
-						var selectable = child.GetComponent<Selectable>();
-						if (selectable != null && selectable.IsInteractable())
-							return selectable;
+						hovered = selectable;
+						break;
 					}
 				}
-				return null;
+
+				selectables.Clear();
+
+				return hovered;
 			}
+
+			private static bool Contains(RectTransform rect, Vector3 worldPosition) => rect.rect.Contains(rect.InverseTransformPoint(worldPosition));
 		}
 	}
 }
