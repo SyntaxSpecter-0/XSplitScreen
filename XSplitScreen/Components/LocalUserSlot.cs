@@ -1138,7 +1138,16 @@ namespace Dodad.XSplitscreen.Components
 				if (player.controllers.Joysticks.Count > 0)
 				{
 					var joystick = player.controllers.Joysticks[0];
-					if (joystick.hatCount > 0)
+
+					// (specter) XInput pads have no Hat, so read the d-pad through Rewired's gamepad template first
+					var dPad = joystick.Templates.OfType<IGamepadTemplate>().FirstOrDefault()?.dPad;
+
+					if (dPad != null)
+					{
+						dpadHorizontal = dPad.right.value ? 1f : (dPad.left.value ? -1f : 0f);
+						dpadVertical = dPad.up.value ? 1f : (dPad.down.value ? -1f : 0f);
+					}
+					else if (joystick.hatCount > 0)
 					{
 						var hat = joystick.Hats[0];
 						dpadHorizontal = hat.buttonRight.value ? 1f : (hat.buttonLeft.value ? -1f : 0f);
