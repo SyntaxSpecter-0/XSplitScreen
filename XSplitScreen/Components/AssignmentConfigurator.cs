@@ -361,6 +361,9 @@ namespace Dodad.XSplitscreen.Components
 				// (specter) A null profile means none was left to assign - letting it through would
 				// hand the slot RoR2's Guest-profile fallback, which can corrupt on next load.
 				if (Options.Slot.Profile == null)
+					Options.GetConfigurator<ProfileConfigurator>()?.ConfirmHighlighted();
+
+				if (Options.Slot.Profile == null)
 				{
 					_claim = null;
 					Options.SetMessage("XSS_NEED_PROFILE", Color.red);
@@ -416,7 +419,10 @@ namespace Dodad.XSplitscreen.Components
 		{
 			if (_claim == null && _hoverTarget != null && _hoverTarget.interactable)
 			{
-				if (_hoverTarget is MPButton button)
+				// (specter) The Game Mode button is a carousel, so a click cycles it like the d-pad would
+				if (_hoverTarget.TryGetComponent<CarouselController>(out var carousel))
+					carousel.MoveCarousel(1);
+				else if (_hoverTarget is MPButton button)
 					button.InvokeClick();
 				else if (_hoverTarget is MPToggle toggle)
 					toggle.isOn = !toggle.isOn;
