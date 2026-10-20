@@ -400,6 +400,12 @@ namespace Dodad.XSplitscreen.Components
 				int total = Instances.Where(x => x.Options.Slot.LocalPlayer != null).Count();
 				int ready = Instances.Where(x => x.IsReady).Count();
 
+				if (ready == total && !AssignmentPanel.AllRegionsClaimed)
+				{
+					Options.SetMessage("XSS_EMPTY_SCREENS", Color.yellow);
+					return;
+				}
+
 				string s = Language.GetString("XSS_READY", Language.currentLanguage.name);
 
 				Options.SetMessage($"{s} ({ready} / {total})", Color.yellow);

@@ -742,7 +742,7 @@ namespace Dodad.XSplitscreen.Components
 			if (state)
 			{
 				var users = AssignmentConfigurator.Instances.Where(x => x.HasUser).ToList();
-				if (users.Count > 1 && users.TrueForAll(x => x.IsReady))
+				if (users.Count > 1 && users.TrueForAll(x => x.IsReady) && AssignmentPanel.AllRegionsClaimed)
 				{
 					AllowLoad = state;
 				}
@@ -810,7 +810,7 @@ namespace Dodad.XSplitscreen.Components
 
 			// Someone joined or left during the countdown
 			var joined = AssignmentConfigurator.Instances.Where(x => x.HasUser).ToList();
-			if (joined.Count < 2 || !joined.TrueForAll(x => x.IsReady))
+			if (joined.Count < 2 || !joined.TrueForAll(x => x.IsReady) || !AssignmentPanel.AllRegionsClaimed)
 			{
 				AllowLoad = false;
 				return;

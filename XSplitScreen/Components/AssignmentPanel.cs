@@ -1,5 +1,6 @@
 ﻿using RoR2.UI;
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -124,10 +125,17 @@ namespace Dodad.XSplitscreen.Components
 
 		//-----------------------------------------------------------------------------------------------------------
 
+		// (specter) Every screen region needs a player, or the run starts with empty viewports.
+		// Counted from the graphs, since region objects are hidden while re-laying out and destroyed a frame late.
+		internal static bool AllRegionsClaimed => Instances == null || Instances.Sum(panel => panel._graph.Faces.Count) <= AssignmentConfigurator.Instances.Count(x => x.IsReady);
+
 		private void OnGraphUpdated()
 		{
 			_display.UpdateDisplay(_graph.Faces);
 			UpdateButtonStates();
+
+			// Removing an empty region can be what makes everyone ready
+			AssignmentConfigurator.OnClaimUpdated?.Invoke(AssignmentConfigurator.Instances.Any(x => x.IsReady));
 		}
 
 		public void Subdivide(Graph.Face face, bool vertical)
