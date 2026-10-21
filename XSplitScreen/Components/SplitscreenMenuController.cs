@@ -789,17 +789,25 @@ namespace Dodad.XSplitscreen.Components
 		{
 			if (countdownBanner == null) return;
 
-			if (!AllowLoad)
+			string message = null;
+
+			if (AllowLoad)
 			{
-				if (countdownBanner.activeSelf)
-					countdownBanner.SetActive(false);
-				return;
+				message = string.Format(Language.GetString("XSS_STARTING_IN"), Mathf.CeilToInt(loadTimer));
+			}
+			else
+			{
+				// (specter) Everyone is ready but the layout still has regions nobody claimed
+				var joined = AssignmentConfigurator.Instances.Where(x => x.HasUser).ToList();
+				if (joined.Count > 1 && joined.TrueForAll(x => x.IsReady) && !AssignmentPanel.AllRegionsClaimed)
+					message = Language.GetString("XSS_EMPTY_SCREENS");
 			}
 
-			if (!countdownBanner.activeSelf)
-				countdownBanner.SetActive(true);
+			if (countdownBanner.activeSelf != (message != null))
+				countdownBanner.SetActive(message != null);
 
-			countdownText.text = $"Starting in {Mathf.CeilToInt(loadTimer)}... release your region to cancel";
+			if (message != null)
+				countdownText.text = message;
 		}
 
 		public void HandleLoadGame()
