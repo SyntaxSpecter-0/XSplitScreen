@@ -31,6 +31,7 @@ namespace Dodad.XSplitscreen
 			UpdatePickerPanelHooks(state);
 			UpdateLookingGlassHooks(state);
 			UpdateMeditateHook(state);
+			UpdateClearCameras(state);
 		}
 
 		private static void ResizePlayerCount(bool state)
@@ -528,6 +529,43 @@ namespace Dodad.XSplitscreen
 			}
 
 			return false;
+		}
+
+		private static readonly List<GameObject> ClearCameras = new List<GameObject>();
+
+		// (specter) Unity never clears screen area outside every camera, so empty regions smeared old frames.
+		// A clear-only camera behind the player cameras keeps them black.
+		private static void UpdateClearCameras(bool isSplitscreenEnabled)
+		{
+			foreach (var clearCamera in ClearCameras)
+				if (clearCamera)
+					UnityEngine.Object.Destroy(clearCamera);
+
+			ClearCameras.Clear();
+
+			if (!isSplitscreenEnabled)
+				return;
+
+			for (int display = 0; display < Display.displays.Length; display++)
+			{
+				if (display != 0 && !Display.displays[display].active)
+					continue;
+
+				var clearCamera = new GameObject($"XSS Clear Camera (Display {display})");
+				UnityEngine.Object.DontDestroyOnLoad(clearCamera);
+
+				var camera = clearCamera.AddComponent<Camera>();
+				camera.clearFlags = CameraClearFlags.SolidColor;
+				camera.backgroundColor = Color.black;
+				camera.cullingMask = 0;
+				camera.depth = -1000f;
+				camera.targetDisplay = display;
+				camera.useOcclusionCulling = false;
+				camera.allowHDR = false;
+				camera.allowMSAA = false;
+
+				ClearCameras.Add(clearCamera);
+			}
 		}
 	}
 }
