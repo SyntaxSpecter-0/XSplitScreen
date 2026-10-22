@@ -59,6 +59,14 @@ namespace Dodad.XSplitscreen.Components
 		private static GameObject countdownBanner;
 		private static TMPro.TextMeshProUGUI countdownText;
 
+		// (specter) Shown when everyone is ready but some regions have no player.
+		// OnClaimUpdated clears the answer whenever players or the layout change.
+		private static GameObject emptyScreensPrompt;
+		private static bool emptyScreensAccepted;
+		private static bool emptyScreensDeclined;
+		private static float emptyScreensPromptShownAt;
+		private static float emptyScreensPromptClosedAt = -1f;
+
 		/// <summary>
 		/// (specter) RoR2's own UI palette. Colors are hardcoded (color-picked off the real game)
 		/// instead of sampled at runtime, since a real HGButton's Image.color is just a neutral
@@ -167,6 +175,7 @@ namespace Dodad.XSplitscreen.Components
 
 			HandleNavigationInput();
 			HandleMenuExit();
+			HandleEmptyScreensPrompt();
 			HandleLoadGame();
 			HandleNotificationUpdate();
 
@@ -234,7 +243,7 @@ namespace Dodad.XSplitscreen.Components
 
 		private void HandleMenuExit()
 		{
-			if (mainPlayer.controllers.GetLastActiveController() is Keyboard || CreditsController.ShowCredits || ShowBackupWarning) 
+			if (mainPlayer.controllers.GetLastActiveController() is Keyboard || CreditsController.ShowCredits || ShowBackupWarning || IsEmptyScreensPromptOpen) 
 				return;
 
 			if (mainInput.East)
@@ -361,6 +370,14 @@ namespace Dodad.XSplitscreen.Components
 				myMainMenuController = null;
 
 			ReleaseAllControllersToMain();
+
+			if (IsEmptyScreensPromptOpen)
+			{
+				emptyScreensPrompt.SetActive(false);
+				LocalUserPanel.AllowChanges = true;
+			}
+
+			emptyScreensPromptClosedAt = -1f;
 
 			onExit.Invoke();
 
@@ -640,6 +657,7 @@ namespace Dodad.XSplitscreen.Components
 			UIHelper.AddPrefab(UIHelper.EUIPrefabIndex.SimpleText, textPrefabLang.gameObject);
 
 			CreateCountdownBanner(assignmentPanel);
+			CreateEmptyScreensPrompt(assignmentPanel);
 
 			// (specter) Hint for the LB/RB "swap monitors" shortcut (LocalUserSlot.
 			// HandleDisplaySlotMovement) - gamepad-only (keyboard/mouse can't use it), shown
@@ -739,6 +757,9 @@ namespace Dodad.XSplitscreen.Components
 
 		public void OnClaimUpdated(bool state)
 		{
+			emptyScreensAccepted = false;
+			emptyScreensDeclined = false;
+
 			if (state)
 			{
 				var users = AssignmentConfigurator.Instances.Where(x => x.HasUser).ToList();
@@ -762,27 +783,161 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void CreateCountdownBanner(Transform assignmentPanel)
 		{
-			countdownBanner = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
+			// (specter) Kept out of the Assignment Panel's layout, which shifts the grid when a child appears.
+			countdownBanner = new GameObject("CountdownBanner", typeof(RectTransform), typeof(CanvasRenderer), typeof(UnityEngine.UI.Image));
 			countdownBanner.transform.SetParent(assignmentPanel, false);
-			countdownBanner.transform.SetAsFirstSibling();
-			countdownBanner.name = "CountdownBanner";
+			countdownBanner.AddComponent<UnityEngine.UI.LayoutElement>().ignoreLayout = true;
 
-			var rect = countdownBanner.GetComponent<RectTransform>();
-			rect.anchorMin = new Vector2(0f, 1f);
-			rect.anchorMax = new Vector2(1f, 1f);
-			rect.pivot = new Vector2(0.5f, 1f);
-			rect.sizeDelta = new Vector2(0f, 40f);
-			rect.anchoredPosition = Vector2.zero;
+			var rect = (RectTransform) countdownBanner.transform;
+			rect.anchorMin = new Vector2(0.1f, 0.5f);
+			rect.anchorMax = new Vector2(0.9f, 0.5f);
+			rect.sizeDelta = new Vector2(0f, 56f);
 
-			// (specter) Raw numeric text instead of a localization token, so the token-driven
-			// controller is dropped here to avoid it stomping the countdown text every frame.
-			Destroy(countdownBanner.GetComponentInChildren<LanguageTextMeshController>());
+			var background = countdownBanner.GetComponent<UnityEngine.UI.Image>();
+			background.color = new Color(0.024f, 0.024f, 0.024f, 0.85f);
+			background.raycastTarget = false;
 
-			countdownText = countdownBanner.GetComponent<TMPro.TextMeshProUGUI>();
+			var textObject = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
+			textObject.transform.SetParent(countdownBanner.transform, false);
+
+			var textRect = (RectTransform) textObject.transform;
+			textRect.anchorMin = Vector2.zero;
+			textRect.anchorMax = Vector2.one;
+			textRect.sizeDelta = Vector2.zero;
+
+			// (specter) The text is set every frame, and the token controller would overwrite it
+			Destroy(textObject.GetComponentInChildren<LanguageTextMeshController>());
+
+			countdownText = textObject.GetComponent<TMPro.TextMeshProUGUI>();
 			countdownText.color = new Color(0.227f, 0.820f, 0.361f); // (specter) matches the confirm-green used elsewhere
 			countdownText.fontSize = 24;
+			countdownText.alignment = TMPro.TextAlignmentOptions.Center;
+			countdownText.raycastTarget = false;
+			textObject.SetActive(true);
 
 			countdownBanner.SetActive(false);
+		}
+
+		private static bool IsEmptyScreensPromptOpen => emptyScreensPrompt != null && emptyScreensPrompt.activeSelf;
+
+		private static bool IsEveryoneReadyWithEmptyScreens()
+		{
+			var joined = AssignmentConfigurator.Instances.Where(x => x.HasUser).ToList();
+			return joined.Count > 1 && joined.TrueForAll(x => x.IsReady) && !AssignmentPanel.AllRegionsClaimed;
+		}
+
+		private void HandleEmptyScreensPrompt()
+		{
+			if (emptyScreensPrompt == null)
+				return;
+
+			// (specter) Slot input resumes after a short delay, so the press that answered the prompt
+			// can't also claim or release a region
+			if (emptyScreensPromptClosedAt >= 0f && Time.unscaledTime - emptyScreensPromptClosedAt > 0.3f)
+			{
+				emptyScreensPromptClosedAt = -1f;
+				LocalUserPanel.AllowChanges = true;
+			}
+
+			if (emptyScreensPromptClosedAt >= 0f)
+				return;
+
+			bool shouldShow = !emptyScreensAccepted && !emptyScreensDeclined && IsEveryoneReadyWithEmptyScreens();
+
+			if (shouldShow != IsEmptyScreensPromptOpen)
+			{
+				emptyScreensPrompt.SetActive(shouldShow);
+				emptyScreensPromptShownAt = Time.unscaledTime;
+
+				if (shouldShow)
+					LocalUserPanel.AllowChanges = false;
+				else
+					emptyScreensPromptClosedAt = Time.unscaledTime;
+			}
+
+			// (specter) Ignore input briefly, since the press that claimed the last region is still held
+			if (!shouldShow || Time.unscaledTime - emptyScreensPromptShownAt < 0.3f)
+				return;
+
+			bool confirm = mainInput.South;
+			bool decline = mainInput.East;
+
+			// (specter) Slots stop polling input while AllowChanges is off, so read each player directly
+			foreach (var slot in LocalUserSlot.Instances)
+			{
+				if (slot.LocalPlayer == null)
+					continue;
+
+				confirm |= slot.LocalPlayer.GetButtonDown(RewiredConsts.Action.UISubmit);
+				decline |= slot.LocalPlayer.GetButtonDown(RewiredConsts.Action.UICancel);
+			}
+
+			if (!confirm && !decline)
+				return;
+
+			emptyScreensAccepted = confirm;
+			emptyScreensDeclined = !confirm;
+			emptyScreensPrompt.SetActive(false);
+			emptyScreensPromptClosedAt = Time.unscaledTime;
+
+			if (confirm)
+			{
+				AllowLoad = true;
+				loadTimer = 5f;
+			}
+		}
+
+		private void CreateEmptyScreensPrompt(Transform assignmentPanel)
+		{
+			emptyScreensPrompt = new GameObject("EmptyScreensPrompt", typeof(RectTransform), typeof(CanvasRenderer), typeof(UnityEngine.UI.Image));
+			emptyScreensPrompt.transform.SetParent(assignmentPanel, false);
+			emptyScreensPrompt.AddComponent<UnityEngine.UI.LayoutElement>().ignoreLayout = true;
+
+			var rect = (RectTransform) emptyScreensPrompt.transform;
+			rect.anchorMin = new Vector2(0.1f, 0.35f);
+			rect.anchorMax = new Vector2(0.9f, 0.65f);
+			rect.sizeDelta = Vector2.zero;
+
+			emptyScreensPrompt.GetComponent<UnityEngine.UI.Image>().color = new Color(0.024f, 0.024f, 0.024f, 0.95f);
+			emptyScreensPrompt.AddComponent<UnityEngine.UI.Outline>().effectColor = new Color(1f, 1f, 1f, 0.6f);
+
+			var layout = emptyScreensPrompt.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
+			layout.padding = new RectOffset(24, 24, 20, 20);
+			layout.spacing = 12;
+			layout.childAlignment = TextAnchor.MiddleCenter;
+			layout.childControlWidth = true;
+			layout.childControlHeight = true;
+			layout.childForceExpandHeight = false;
+
+			var xbox = LocalUserSlot.GamepadGlyphs["xbox"];
+			var ps = LocalUserSlot.GamepadGlyphs["ps4"];
+			string confirmGlyphs = $"<sprite=\"{xbox.asset}\" name=\"{xbox.confirm}\"><sprite=\"{ps.asset}\" name=\"{ps.confirm}\">";
+			// (specter) B / Circle glyphs, from element 7 of RoR2's Glyphs table
+			string declineGlyphs = $"<sprite=\"{xbox.asset}\" name=\"texXBoxOneGlyphs_1\"><sprite=\"{ps.asset}\" name=\"texPS4GlyphsUnified_2\">";
+
+			AddPromptText(Language.GetString("XSS_EMPTY_PROMPT_TITLE"), 30, Color.white);
+			AddPromptText(Language.GetString("XSS_EMPTY_PROMPT_BODY"), 20, RoR2MutedColor);
+			AddPromptText($"{confirmGlyphs} {Language.GetString("XSS_CONFIRM")}      {declineGlyphs} {Language.GetString("XSS_DECLINE")}", 22, Color.white);
+
+			emptyScreensPrompt.SetActive(false);
+		}
+
+		private static void AddPromptText(string text, float fontSize, Color color)
+		{
+			var textObject = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
+			textObject.transform.SetParent(emptyScreensPrompt.transform, false);
+
+			// (specter) The token controller would overwrite this text
+			Destroy(textObject.GetComponentInChildren<LanguageTextMeshController>());
+
+			var tmp = textObject.GetComponent<TMPro.TextMeshProUGUI>();
+			tmp.text = text;
+			tmp.fontSize = fontSize;
+			tmp.color = color;
+			tmp.alignment = TMPro.TextAlignmentOptions.Center;
+			tmp.enableWordWrapping = true;
+
+			textObject.SetActive(true);
 		}
 
 		private void UpdateCountdownBanner()
@@ -798,8 +953,7 @@ namespace Dodad.XSplitscreen.Components
 			else
 			{
 				// (specter) Everyone is ready but the layout still has regions nobody claimed
-				var joined = AssignmentConfigurator.Instances.Where(x => x.HasUser).ToList();
-				if (joined.Count > 1 && joined.TrueForAll(x => x.IsReady) && !AssignmentPanel.AllRegionsClaimed)
+				if (emptyScreensDeclined && IsEveryoneReadyWithEmptyScreens())
 					message = Language.GetString("XSS_EMPTY_SCREENS");
 			}
 
@@ -818,7 +972,7 @@ namespace Dodad.XSplitscreen.Components
 
 			// Someone joined or left during the countdown
 			var joined = AssignmentConfigurator.Instances.Where(x => x.HasUser).ToList();
-			if (joined.Count < 2 || !joined.TrueForAll(x => x.IsReady) || !AssignmentPanel.AllRegionsClaimed)
+			if (joined.Count < 2 || !joined.TrueForAll(x => x.IsReady) || !(AssignmentPanel.AllRegionsClaimed || emptyScreensAccepted))
 			{
 				AllowLoad = false;
 				return;
