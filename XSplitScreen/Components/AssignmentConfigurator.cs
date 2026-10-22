@@ -285,14 +285,15 @@ namespace Dodad.XSplitscreen.Components
 				MoveCursor(_cursor, new Vector2(Options.Slot.Input.LeftRightDelta, Options.Slot.Input.UpDownDelta), _maxSpeed, _maxAcceleration);
 				CheckCursorHovering();
 
-				if (Options.Slot.Input.South)
+				// (specter) With a settings tab open, A belongs to the tab
+				if (Options.Slot.Input.South && !Options.IsExpanded)
 				{
 					OnConfirm();
 				}
 
 				// (specter) East releases a claimed region only - the cursor is always-on now, so
 				// calling Cleanup() here would hide it permanently with no way back.
-				if (Options.Slot.Input.East && _claim != null)
+				if (Options.Slot.Input.East && _claim != null && !Options.IsExpanded)
 					ResetClaim();
 			}
 
