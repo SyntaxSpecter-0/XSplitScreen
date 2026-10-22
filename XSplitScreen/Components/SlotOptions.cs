@@ -209,6 +209,13 @@ namespace Dodad.XSplitscreen.Components
 			if (!IsExpanded)
 				return;
 
+			// (specter) B backs out one step: it closes the tab first, then releases the screen next time
+			if (Slot.Input.East)
+			{
+				CloseConfigurator();
+				return;
+			}
+
 			if (_cyclable.Count == 0)
 				return;
 
