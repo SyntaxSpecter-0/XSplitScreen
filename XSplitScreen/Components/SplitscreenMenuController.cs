@@ -65,7 +65,6 @@ namespace Dodad.XSplitscreen.Components
 		private static bool emptyScreensAccepted;
 		private static bool emptyScreensDeclined;
 		private static float emptyScreensPromptShownAt;
-		private static float emptyScreensPromptClosedAt = -1f;
 
 		/// <summary>
 		/// (specter) RoR2's own UI palette. Colors are hardcoded (color-picked off the real game)
@@ -172,6 +171,7 @@ namespace Dodad.XSplitscreen.Components
 			if (monitorId != 0) return;
 
 			mainInput.Update(mainPlayer);
+			UpdateSlotResume();
 
 			HandleNavigationInput();
 			HandleMenuExit();
@@ -243,7 +243,7 @@ namespace Dodad.XSplitscreen.Components
 
 		private void HandleMenuExit()
 		{
-			if (mainPlayer.controllers.GetLastActiveController() is Keyboard || CreditsController.ShowCredits || ShowBackupWarning || IsEmptyScreensPromptOpen) 
+			if (mainPlayer.controllers.GetLastActiveController() is Keyboard || CreditsController.ShowCredits || ShowBackupWarning || IsEmptyScreensPromptOpen || slotsResumeAt >= 0f) 
 				return;
 
 			if (mainInput.East)
@@ -372,12 +372,11 @@ namespace Dodad.XSplitscreen.Components
 			ReleaseAllControllersToMain();
 
 			if (IsEmptyScreensPromptOpen)
-			{
 				emptyScreensPrompt.SetActive(false);
-				LocalUserPanel.AllowChanges = true;
-			}
 
-			emptyScreensPromptClosedAt = -1f;
+			CreditsController.ShowCredits = false;
+			slotsResumeAt = -1f;
+			LocalUserPanel.AllowChanges = true;
 
 			onExit.Invoke();
 
@@ -818,6 +817,44 @@ namespace Dodad.XSplitscreen.Components
 			countdownBanner.SetActive(false);
 		}
 
+		private static float slotsResumeAt = -1f;
+
+		// (specter) Popups pause slot input, then resume it shortly after closing so the press that
+		// answered the popup doesn't also claim, release or remove anything
+		internal static void PauseSlots()
+		{
+			LocalUserPanel.AllowChanges = false;
+			slotsResumeAt = -1f;
+		}
+
+		internal static void ResumeSlotsShortly() => slotsResumeAt = Time.unscaledTime + 0.3f;
+
+		private static void UpdateSlotResume()
+		{
+			if (slotsResumeAt >= 0f && Time.unscaledTime >= slotsResumeAt)
+			{
+				slotsResumeAt = -1f;
+				LocalUserPanel.AllowChanges = true;
+			}
+		}
+
+		// (specter) Joined players plus the keyboard. Controllers that haven't joined still sit on
+		// PlayerMain, so its gamepad input is left out.
+		internal static bool AnyPlayerPressed(int action, KeyCode key)
+		{
+			if (ReInput.controllers.Keyboard.GetKeyDown(key))
+				return true;
+
+			if (LocalUserSlot.Instances == null)
+				return false;
+
+			foreach (var slot in LocalUserSlot.Instances)
+				if (slot != null && slot.LocalPlayer != null && slot.LocalPlayer.GetButtonDown(action))
+					return true;
+
+			return false;
+		}
+
 		private static bool IsEmptyScreensPromptOpen => emptyScreensPrompt != null && emptyScreensPrompt.activeSelf;
 
 		private static bool IsEveryoneReadyWithEmptyScreens()
@@ -831,17 +868,6 @@ namespace Dodad.XSplitscreen.Components
 			if (emptyScreensPrompt == null)
 				return;
 
-			// (specter) Slot input resumes after a short delay, so the press that answered the prompt
-			// can't also claim or release a region
-			if (emptyScreensPromptClosedAt >= 0f && Time.unscaledTime - emptyScreensPromptClosedAt > 0.3f)
-			{
-				emptyScreensPromptClosedAt = -1f;
-				LocalUserPanel.AllowChanges = true;
-			}
-
-			if (emptyScreensPromptClosedAt >= 0f)
-				return;
-
 			bool shouldShow = !emptyScreensAccepted && !emptyScreensDeclined && IsEveryoneReadyWithEmptyScreens();
 
 			if (shouldShow != IsEmptyScreensPromptOpen)
@@ -850,27 +876,17 @@ namespace Dodad.XSplitscreen.Components
 				emptyScreensPromptShownAt = Time.unscaledTime;
 
 				if (shouldShow)
-					LocalUserPanel.AllowChanges = false;
+					PauseSlots();
 				else
-					emptyScreensPromptClosedAt = Time.unscaledTime;
+					ResumeSlotsShortly();
 			}
 
 			// (specter) Ignore input briefly, since the press that claimed the last region is still held
 			if (!shouldShow || Time.unscaledTime - emptyScreensPromptShownAt < 0.3f)
 				return;
 
-			bool confirm = mainInput.South;
-			bool decline = mainInput.East;
-
-			// (specter) Slots stop polling input while AllowChanges is off, so read each player directly
-			foreach (var slot in LocalUserSlot.Instances)
-			{
-				if (slot.LocalPlayer == null)
-					continue;
-
-				confirm |= slot.LocalPlayer.GetButtonDown(RewiredConsts.Action.UISubmit);
-				decline |= slot.LocalPlayer.GetButtonDown(RewiredConsts.Action.UICancel);
-			}
+			bool confirm = AnyPlayerPressed(RewiredConsts.Action.UISubmit, KeyCode.Return);
+			bool decline = AnyPlayerPressed(RewiredConsts.Action.UICancel, KeyCode.Escape);
 
 			if (!confirm && !decline)
 				return;
@@ -878,7 +894,7 @@ namespace Dodad.XSplitscreen.Components
 			emptyScreensAccepted = confirm;
 			emptyScreensDeclined = !confirm;
 			emptyScreensPrompt.SetActive(false);
-			emptyScreensPromptClosedAt = Time.unscaledTime;
+			ResumeSlotsShortly();
 
 			if (confirm)
 			{
@@ -898,8 +914,12 @@ namespace Dodad.XSplitscreen.Components
 			rect.anchorMax = new Vector2(0.9f, 0.65f);
 			rect.sizeDelta = Vector2.zero;
 
-			emptyScreensPrompt.GetComponent<UnityEngine.UI.Image>().color = new Color(0.024f, 0.024f, 0.024f, 0.95f);
-			emptyScreensPrompt.AddComponent<UnityEngine.UI.Outline>().effectColor = new Color(1f, 1f, 1f, 0.6f);
+			// (specter) Same panel art as the game's menu buttons, taken from the cloned Discord button
+			var background = emptyScreensPrompt.GetComponent<UnityEngine.UI.Image>();
+			var buttonImage = discordButton.image;
+			background.sprite = buttonImage.sprite;
+			background.type = buttonImage.type;
+			background.color = buttonImage.color * discordButton.colors.normalColor;
 
 			var layout = emptyScreensPrompt.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
 			layout.padding = new RectOffset(24, 24, 20, 20);
