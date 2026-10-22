@@ -168,6 +168,12 @@ namespace Dodad.XSplitscreen.Components
 		{
 			base.Update();
 
+			if (hideSceneAt >= 0f && Time.unscaledTime >= hideSceneAt)
+			{
+				hideSceneAt = -1f;
+				SetSceneHidden(true);
+			}
+
 			if (monitorId != 0) return;
 
 			mainInput.Update(mainPlayer);
@@ -312,6 +318,9 @@ namespace Dodad.XSplitscreen.Components
 
 		public override void OnEnter(MainMenuController mainMenuController)
 		{
+			// (specter) Wait for the camera fly-in and menu fade before hiding the scene
+			hideSceneAt = Time.unscaledTime + 0.6f;
+
 			if (monitorId == 0)
 			{
 				SplitscreenUserManager.DisableSplitscreen();
@@ -359,6 +368,9 @@ namespace Dodad.XSplitscreen.Components
 
 		public override void OnExit(MainMenuController mainMenuController)
 		{
+			hideSceneAt = -1f;
+			SetSceneHidden(false);
+
 			if (monitorId != 0)
 			{
 				gameObject.SetActive(false);
@@ -815,6 +827,35 @@ namespace Dodad.XSplitscreen.Components
 			textObject.SetActive(true);
 
 			countdownBanner.SetActive(false);
+		}
+
+		private float hideSceneAt = -1f;
+		private bool sceneHidden;
+		private int savedCullingMask;
+		private CameraClearFlags savedClearFlags;
+
+		// (specter) The opaque menu background covers the 3D scene, so the camera renders nothing behind it.
+		// It stays enabled because other code reads Camera.main, and post-processing is left alone since
+		// toggling it loses the scene's fog and grading.
+		private void SetSceneHidden(bool hidden)
+		{
+			if (!_camera || hidden == sceneHidden)
+				return;
+
+			sceneHidden = hidden;
+
+			if (hidden)
+			{
+				savedCullingMask = _camera.cullingMask;
+				savedClearFlags = _camera.clearFlags;
+				_camera.cullingMask = 0;
+				_camera.clearFlags = CameraClearFlags.SolidColor;
+			}
+			else
+			{
+				_camera.cullingMask = savedCullingMask;
+				_camera.clearFlags = savedClearFlags;
+			}
 		}
 
 		private static float slotsResumeAt = -1f;
