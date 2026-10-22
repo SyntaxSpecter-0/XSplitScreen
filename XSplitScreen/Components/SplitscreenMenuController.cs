@@ -703,10 +703,7 @@ namespace Dodad.XSplitscreen.Components
 				var ps = LocalUserSlot.GamepadGlyphs["ps4"];
 				string psGlyphs = $"<sprite=\"{ps.asset}\" name=\"{ps.lb}\"><sprite=\"{ps.asset}\" name=\"{ps.rb}\">";
 				string xboxGlyphs = $"<sprite=\"{xbox.asset}\" name=\"{xbox.lb}\"><sprite=\"{xbox.asset}\" name=\"{xbox.rb}\">";
-				// (specter) Hardcoded rather than via RoR2.Language.GetString - the token kept
-				// resolving to a stale value (see Plugin.LoadLanguage's language.json merge), not
-				// worth chasing for a legend this minor.
-				legendText.text = $"{psGlyphs}  {xboxGlyphs}  Move to Another Display";
+				legendText.text = $"{psGlyphs}  {xboxGlyphs}  {Language.GetString("XSS_SWAP_DISPLAY")}";
 
 				// (specter) Positioned relative to the Back button's own RectTransform, sharing its
 				// anchors AND pivot, rather than guessing at backPanelRect's anchor math (which
@@ -733,14 +730,11 @@ namespace Dodad.XSplitscreen.Components
 			if (ShowBackupWarning)
 			{
 				var warningText = UIHelper.GetPrefab(UIHelper.EUIPrefabIndex.SimpleText);
-				// (specter) Hardcoded instead of token-driven, to avoid the same language.json
-				// staleness as the swap-legend comment above. TMP is resolved separately from
-				// the controller's own textMeshPro field, which isn't set until OnEnable -
-				// disabling the controller below would leave it null.
+				// (specter) Resolved once here, since the controller's own textMeshPro isn't set until OnEnable
 				var warningTmp = warningText.GetComponentInChildren<TMPro.TMP_Text>();
 				var warningController = warningText.GetComponentInChildren<LanguageTextMeshController>();
 				warningController.enabled = false;
-				warningTmp.text = "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session. <br><br>If you don't have a separate profile for every player, create them from the main menu BEFORE setting up splitscreen - claiming a screen without one can leave a corrupted profile behind.";
+				warningTmp.text = Language.GetString("XSS_BACKUP_WARN");
 				var warnLayout = warningText.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
 				var warnRect = warningText.gameObject.GetComponent<RectTransform>();
 				warnRect.anchorMax = new Vector2(0.8f, 1f);
