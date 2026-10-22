@@ -568,7 +568,10 @@ namespace Dodad.XSplitscreen.Components
 			gameModePicker = gameModeButton.GetComponent<CarouselController>();
 			BuildGameModeChoices();
 
-			gameModeButton.GetComponent<MPEventSystemLocator>().Awake();
+			// (specter) The carousel's arrow buttons need their event system too, or selecting one throws in HGButton.OnSelect
+			foreach (var locator in gameModeButton.GetComponentsInChildren<MPEventSystemLocator>(true))
+				locator.Awake();
+
 			Destroy(gameModeButton.transform.Find("Canvas").gameObject);
 			
 			// Multi monitor
