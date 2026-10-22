@@ -374,7 +374,7 @@ namespace Dodad.XSplitscreen.Components
 			_yChevron.SetParent(_collapsedRow, false);
 			_yChevron.SetSiblingIndex(yToggle.GetSiblingIndex());
 			var configureLabel = _yChevron.GetComponent<TextMeshProUGUI>();
-			configureLabel.text = "Configure";
+			configureLabel.text = RoR2.Language.GetString("XSS_CONFIGURE");
 			configureLabel.color = SplitscreenMenuController.RoR2TextColor;
 			// (specter) Unset minWidth defers to TMP's own unwrapped-text width, which is rigid -
 			// same bug as NameText/ValueText. Auto-size + explicit low minWidth fixes it here too.
