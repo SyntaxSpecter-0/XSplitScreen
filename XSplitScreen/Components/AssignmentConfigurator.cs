@@ -227,8 +227,7 @@ namespace Dodad.XSplitscreen.Components
 					_cursor.transform.localScale = Vector3.one;
 					_cursor.transform.position = transform.position;
 					_cursorImage = _cursor.gameObject.AddComponent<Image>();
-					var texture = Plugin.Resources.LoadAsset<Texture2D>("crosshair.png");
-					_cursorImage.sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+					_cursorImage.sprite = UIHelper.GetSprite("crosshair.png");
 					_cursor.sizeDelta = new Vector2(64f, 64f);
 
 					originalScale = _cursor.localScale;
@@ -262,7 +261,7 @@ namespace Dodad.XSplitscreen.Components
 
 			_anchorInitialized = true;
 			_anchoredPanel = currentPanel;
-			_controllerRect = currentPanel.Controller?.GetComponent<RectTransform>();
+			_controllerRect = currentPanel.Controller ? currentPanel.Controller.GetComponent<RectTransform>() : null;
 
 			// (specter) Parented to Main Panel instead of just Assignment Panel, so MoveCursor's
 			// clamp lets it reach the Credits/Discord/Back buttons too.

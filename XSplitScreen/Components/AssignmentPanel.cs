@@ -34,8 +34,7 @@ namespace Dodad.XSplitscreen.Components
 
 			// Initial button
 
-			var plusTex = Plugin.Resources.LoadAsset<Texture2D>("plus.png");
-			var plusSprite = Sprite.Create(plusTex, new Rect(0, 0, plusTex.width, plusTex.height), new Vector2(0.5f, 0.5f));
+			var plusSprite = UIHelper.GetSprite("plus.png");
 
 			_initialImage = new GameObject("AddInitialButton").AddComponent<Image>();
 			_initialImage.sprite = plusSprite;

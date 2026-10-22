@@ -234,7 +234,7 @@ namespace Dodad.XSplitscreen.Components
 			var colorContent = Options.Slot.transform.Find("ExpandedContent/ColorContent");
 
 			_hueGradient = (RectTransform) colorContent.Find("HueRow/HueBarContainer");
-			_hueGradient.GetComponent<Image>().sprite = Sprite.Create(Hue, new Rect(0, 0, 256, 1), new Vector2(0.5f, 0.5f));
+			_hueGradient.GetComponent<Image>().sprite = UIHelper.GetSprite(Hue);
 			var colorButton = _hueGradient.gameObject.AddComponent<MPButton>();
 			colorButton.onSelect = new UnityEngine.Events.UnityEvent();
 			colorButton.onSelect.AddListener(() => StartDragRoutine());
