@@ -21,6 +21,7 @@ namespace Dodad.XSplitscreen.Components
 					new Color(0.8f, 0.8f, 0.8f, 1f)
 		};
 
+		private bool _wasShowing;
 		private string _category;
 		private int _index;
 		private float _spawnTimer;
@@ -43,6 +44,17 @@ namespace Dodad.XSplitscreen.Components
 
 		private void Update()
 		{
+			// (specter) Slots stay paused while the credits are up, see SplitscreenMenuController.PauseSlots
+			if (ShowCredits != _wasShowing)
+			{
+				_wasShowing = ShowCredits;
+
+				if (ShowCredits)
+					SplitscreenMenuController.PauseSlots();
+				else
+					SplitscreenMenuController.ResumeSlotsShortly();
+			}
+
 			if (ShowCredits && AnyCloseInputPressed())
 				ShowCredits = false;
 
@@ -73,24 +85,14 @@ namespace Dodad.XSplitscreen.Components
 			_group = GetComponent<CanvasGroup>();
 		}
 
-		// (specter) Check every slot's input in addition to SplitscreenMenuController.MainInput,
-		// since a non-host controller could otherwise open credits but never close them.
 		private static bool AnyCloseInputPressed()
 		{
-			if (SplitscreenMenuController.MainInput != null &&
-				(SplitscreenMenuController.MainInput.MouseLeft || SplitscreenMenuController.MainInput.East || SplitscreenMenuController.MainInput.South))
-				return true;
+			// (specter) Any controller can close them, joined or not, since whoever opened them may not have joined yet
+			var main = SplitscreenMenuController.MainInput;
 
-			if (LocalUserSlot.Instances != null)
-			{
-				foreach (var slot in LocalUserSlot.Instances)
-				{
-					if (slot != null && slot.Input != null && (slot.Input.East || slot.Input.South))
-						return true;
-				}
-			}
-
-			return false;
+			return (main != null && (main.MouseLeft || main.South || main.East))
+				|| SplitscreenMenuController.AnyPlayerPressed(RewiredConsts.Action.UISubmit, KeyCode.Return)
+				|| SplitscreenMenuController.AnyPlayerPressed(RewiredConsts.Action.UICancel, KeyCode.Escape);
 		}
 
 		private void InitializeRollerPrefab()
