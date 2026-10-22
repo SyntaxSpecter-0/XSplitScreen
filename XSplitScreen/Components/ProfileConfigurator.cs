@@ -41,7 +41,7 @@ namespace Dodad.XSplitscreen.Components
 		/// <summary>
 		/// Localization token for the profile configurator.
 		/// </summary>
-		public override string GetName() => "Profile";
+		public override string GetName() => "XSS_PROFILE";
 
 		#endregion
 

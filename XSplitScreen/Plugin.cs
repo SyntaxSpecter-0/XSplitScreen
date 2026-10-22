@@ -171,7 +171,8 @@ namespace Dodad.XSplitscreen
 
 				foreach (var token in language.Value)
 				{
-					if (token.Value == null)
+					// (specter) Old dumps were written before Plugin.cs was UTF-8, so their accents became U+FFFD
+					if (token.Value == null || token.Value.Contains('\uFFFD'))
 						continue;
 
 					if (builtIn != null && builtIn.TryGetValue(token.Key, out var builtInValue) && builtInValue == token.Value)
@@ -222,12 +223,15 @@ namespace Dodad.XSplitscreen
 				{ "XSS_READY", "Ready" },
 				{ "XSS_EMPTY_SCREENS", "Remove empty screens" },
 				{ "XSS_STARTING_IN", "Starting in {0}... release your region to cancel" },
+				{ "XSS_SWAP_DISPLAY", "Move to Another Display" },
+				{ "XSS_PROFILE", "Profile" },
+				{ "XSS_CONFIGURE", "Configure" },
 				{ "XSS_EMPTY_PROMPT_TITLE", "Start with unassigned screens?" },
 				{ "XSS_EMPTY_PROMPT_BODY", "Some screen slots have no player and will stay black." },
 				{ "XSS_CONFIRM", "Confirm" },
 				{ "XSS_DECLINE", "Decline" },
 				{ "XSS_ONLINE", "Online" },
-				{ "XSS_WARN", "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session. <br><br>If you don't have a separate profile for every player, create them from the main menu BEFORE setting up splitscreen - claiming a screen without one can leave a corrupted profile behind." },
+				{ "XSS_BACKUP_WARN", "Multiple instances of corrupted profiles and lost save data have been reported from users playing in the official local splitscreen mode on consoles. <br><br>XSplitscreen makes no guarantee concerning the safety of your profiles. It is HIGHLY RECOMMENDED to create backups before each session. <br><br>If you don't have a separate profile for every player, create them from the main menu BEFORE setting up splitscreen - claiming a screen without one can leave a corrupted profile behind." },
 				{ "XSS_NEED_PROFILE", "Create a profile from the main menu first" },
 				{ "XSS_CREDITS", "Credits" },
 				{ "XSS_CREDITS_HOVER", "Enable or disable credits" },
@@ -252,12 +256,15 @@ namespace Dodad.XSplitscreen
 				{ "XSS_READY", "Pronto" },
 				{ "XSS_EMPTY_SCREENS", "Remova as telas vazias" },
 				{ "XSS_STARTING_IN", "Começando em {0}... solte sua região para cancelar" },
+				{ "XSS_SWAP_DISPLAY", "Mover para Outra Tela" },
+				{ "XSS_PROFILE", "Perfil" },
+				{ "XSS_CONFIGURE", "Configurar" },
 				{ "XSS_EMPTY_PROMPT_TITLE", "Começar com telas sem jogador?" },
 				{ "XSS_EMPTY_PROMPT_BODY", "Algumas áreas da tela não têm jogador e ficarão pretas." },
 				{ "XSS_CONFIRM", "Confirmar" },
 				{ "XSS_DECLINE", "Recusar" },
 				{ "XSS_ONLINE", "Online" },
-				{ "XSS_WARN", "Vários casos de perfis corrompidos e perda de dados salvos foram relatados por jogadores usando o modo oficial de tela dividida local nos consoles. <br><br>O XSplitscreen não oferece nenhuma garantia quanto à segurança dos seus perfis. É ALTAMENTE RECOMENDADO fazer backups antes de cada sessão. <br><br>Se você não tiver um perfil separado para cada jogador, crie-os no menu principal ANTES de configurar a tela dividida - escolher uma tela sem perfil pode deixar um perfil corrompido." },
+				{ "XSS_BACKUP_WARN", "Vários casos de perfis corrompidos e perda de dados salvos foram relatados por jogadores usando o modo oficial de tela dividida local nos consoles. <br><br>O XSplitscreen não oferece nenhuma garantia quanto à segurança dos seus perfis. É ALTAMENTE RECOMENDADO fazer backups antes de cada sessão. <br><br>Se você não tiver um perfil separado para cada jogador, crie-os no menu principal ANTES de configurar a tela dividida - escolher uma tela sem perfil pode deixar um perfil corrompido." },
 				{ "XSS_NEED_PROFILE", "Crie um perfil no menu principal primeiro" },
 				{ "XSS_CREDITS", "Créditos" },
 				{ "XSS_CREDITS_HOVER", "Ativar ou desativar os créditos" },
@@ -282,12 +289,15 @@ namespace Dodad.XSplitscreen
 				{ "XSS_READY", "Prêt" },
 				{ "XSS_EMPTY_SCREENS", "Retirez les écrans vides" },
 				{ "XSS_STARTING_IN", "Lancement dans {0}... libérez votre zone pour annuler" },
+				{ "XSS_SWAP_DISPLAY", "Changer d'écran" },
+				{ "XSS_PROFILE", "Profil" },
+				{ "XSS_CONFIGURE", "Configurer" },
 				{ "XSS_EMPTY_PROMPT_TITLE", "Commencer avec des écrans non attribués ?" },
 				{ "XSS_EMPTY_PROMPT_BODY", "Certaines zones d'écran n'ont pas de joueur et resteront noires." },
 				{ "XSS_CONFIRM", "Confirmer" },
 				{ "XSS_DECLINE", "Refuser" },
 				{ "XSS_ONLINE", "En ligne" },
-				{ "XSS_WARN", "De nombreux cas de profils corrompus et de sauvegardes perdues ont été signalés par des joueurs utilisant le mode écran partagé local officiel sur consoles. <br><br>XSplitscreen ne garantit en rien la sécurité de vos profils. Il est FORTEMENT RECOMMANDÉ de faire des sauvegardes avant chaque session. <br><br>Si vous n'avez pas un profil distinct pour chaque joueur, créez-les depuis le menu principal AVANT de configurer l'écran partagé - choisir un écran sans profil peut laisser un profil corrompu." },
+				{ "XSS_BACKUP_WARN", "De nombreux cas de profils corrompus et de sauvegardes perdues ont été signalés par des joueurs utilisant le mode écran partagé local officiel sur consoles. <br><br>XSplitscreen ne garantit en rien la sécurité de vos profils. Il est FORTEMENT RECOMMANDÉ de faire des sauvegardes avant chaque session. <br><br>Si vous n'avez pas un profil distinct pour chaque joueur, créez-les depuis le menu principal AVANT de configurer l'écran partagé - choisir un écran sans profil peut laisser un profil corrompu." },
 				{ "XSS_NEED_PROFILE", "Créez d'abord un profil depuis le menu principal" },
 				{ "XSS_CREDITS", "Crédits" },
 				{ "XSS_CREDITS_HOVER", "Activer ou désactiver les crédits" },
