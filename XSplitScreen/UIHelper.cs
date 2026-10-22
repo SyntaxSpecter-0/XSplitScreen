@@ -19,6 +19,22 @@ namespace Dodad.XSplitscreen
 		private static Dictionary<EUIPrefabIndex, GameObject> prefabs;
 		private static GameObject prefabRoot;
 
+		// (specter) Sprites made at runtime are never cleaned up, so each texture gets one shared sprite
+		private static readonly Dictionary<Texture2D, Sprite> sprites = new Dictionary<Texture2D, Sprite>();
+
+		internal static Sprite GetSprite(Texture2D texture)
+		{
+			if (!sprites.TryGetValue(texture, out var sprite) || sprite == null)
+			{
+				sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+				sprites[texture] = sprite;
+			}
+
+			return sprite;
+		}
+
+		internal static Sprite GetSprite(string textureAsset) => GetSprite(Plugin.Resources.LoadAsset<Texture2D>(textureAsset));
+
 		//-----------------------------------------------------------------------------------------------------------
 
 		/// <summary>

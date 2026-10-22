@@ -1,4 +1,5 @@
-﻿using Rewired;
+﻿using HG;
+using Rewired;
 using RoR2;
 using RoR2.UI;
 using System;
@@ -473,7 +474,7 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private static void SetGlyphBoxSize(TextMeshProUGUI label, float size)
 		{
-			var layout = label.GetComponent<LayoutElement>() ?? label.gameObject.AddComponent<LayoutElement>();
+			var layout = label.EnsureComponent<LayoutElement>();
 			layout.preferredWidth = size;
 			layout.preferredHeight = size;
 			layout.minWidth = 0;
@@ -627,7 +628,7 @@ namespace Dodad.XSplitscreen.Components
 			collapsedImage.color = buttonColor;
 			AddBoxHighlight(collapsedImage.gameObject);
 
-			var expandedImage = _expandedContent.GetComponent<Image>() ?? _expandedContent.gameObject.AddComponent<Image>();
+			var expandedImage = _expandedContent.EnsureComponent<Image>();
 			expandedImage.color = buttonColor;
 			expandedImage.raycastTarget = false;
 			AddBoxHighlight(expandedImage.gameObject);
@@ -640,7 +641,7 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private static void AddBoxHighlight(GameObject target)
 		{
-			var outline = target.GetComponent<Outline>() ?? target.AddComponent<Outline>();
+			var outline = target.EnsureComponent<Outline>();
 			outline.effectColor = SplitscreenMenuController.RoR2MutedColor;
 			outline.effectDistance = new Vector2(1.5f, 1.5f);
 			outline.useGraphicAlpha = false;
@@ -941,11 +942,9 @@ namespace Dodad.XSplitscreen.Components
 
 			string deviceKey = GetDeviceKeyForCurrentController(_localPlayer);
 
-			if (_deviceIcon.sprite != null && _deviceIcon.sprite.name == deviceKey)
-				return;
-
+			// (specter) Shares the bundle's sprite, since a copy per call was never destroyed
 			if (DeviceIcons.TryGetValue(deviceKey, out Sprite sprite) && sprite != null)
-				_deviceIcon.sprite = Instantiate(sprite);
+				_deviceIcon.sprite = sprite;
 		}
 
 		/// <summary>

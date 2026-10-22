@@ -40,7 +40,7 @@ namespace Dodad.XSplitscreen.Components
 
 			var bgFillerImage = bgFillerTransform.GetComponent<UnityEngine.UI.Image>();
 
-			bgFillerImage.sprite = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, 1, 1), new(0.5f, 0.5f));
+			bgFillerImage.sprite = UIHelper.GetSprite(Texture2D.whiteTexture);
 			bgFillerImage.color = new Color(.5f, .5f, .5f, 0.1f);
 
 			claim = bgFillerTransform.gameObject.AddComponent<DisplayClaim>();
@@ -69,8 +69,7 @@ namespace Dodad.XSplitscreen.Components
 			button3.onClick.AddListener(() => controller.Remove(face));
 
 			var image1 = utilButtonTransforms[0].GetComponent<UnityEngine.UI.Image>();
-			var xTex = Plugin.Resources.LoadAsset<Texture2D>("device_x.png");
-			image1.sprite = Sprite.Create(xTex, new Rect(0, 0, xTex.width, xTex.height), new Vector2(0.5f, 0.5f));
+			image1.sprite = UIHelper.GetSprite("device_x.png");
 
 			gameObject.GetComponent<UnityEngine.UI.Image>().enabled = false;
 
