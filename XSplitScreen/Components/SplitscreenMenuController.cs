@@ -62,6 +62,10 @@ namespace Dodad.XSplitscreen.Components
 		// (specter) Shown when everyone is ready but some regions have no player.
 		// OnClaimUpdated clears the answer whenever players or the layout change.
 		private static GameObject emptyScreensPrompt;
+		private static PopupJuice emptyScreensPromptJuice;
+		private static PopupJuice countdownBannerJuice;
+		private static int lastCountdownSecond = -1;
+		private static bool bannerShowsEmptyScreens;
 		private static bool emptyScreensAccepted;
 		private static bool emptyScreensDeclined;
 		private static float emptyScreensPromptShownAt;
@@ -75,6 +79,9 @@ namespace Dodad.XSplitscreen.Components
 		public static Color RoR2ButtonColor { get; private set; } = new Color(0.259f, 0.322f, 0.380f); // #425261
 		public static Color RoR2TextColor { get; private set; } = Color.white; // #ffffff
 		public static Color RoR2AccentColor { get; private set; } = new Color(0.902f, 0.271f, 0.243f); // #e6453e
+		private static readonly Color ConfirmColor = new Color(0.227f, 0.820f, 0.361f); // (specter) matches the confirm-green used elsewhere
+		private static readonly Color WarningColor = new Color(1f, 0.82f, 0.32f);
+
 		public static Color RoR2MutedColor { get; private set; } = new Color(0.541f, 0.553f, 0.588f); // #8a8d96
 		public static TMPro.TMP_FontAsset RoR2Font { get; private set; }
 		public static Material RoR2FontMaterial { get; private set; }
@@ -383,8 +390,14 @@ namespace Dodad.XSplitscreen.Components
 
 			ReleaseAllControllersToMain();
 
-			if (IsEmptyScreensPromptOpen)
-				emptyScreensPrompt.SetActive(false);
+			if (emptyScreensPromptJuice)
+				emptyScreensPromptJuice.HideImmediate();
+
+			if (countdownBannerJuice)
+				countdownBannerJuice.HideImmediate();
+
+			lastCountdownSecond = -1;
+			bannerShowsEmptyScreens = false;
 
 			CreditsController.ShowCredits = false;
 			slotsResumeAt = -1f;
@@ -817,12 +830,13 @@ namespace Dodad.XSplitscreen.Components
 			Destroy(textObject.GetComponentInChildren<LanguageTextMeshController>());
 
 			countdownText = textObject.GetComponent<TMPro.TextMeshProUGUI>();
-			countdownText.color = new Color(0.227f, 0.820f, 0.361f); // (specter) matches the confirm-green used elsewhere
+			countdownText.color = ConfirmColor;
 			countdownText.fontSize = 24;
 			countdownText.alignment = TMPro.TextAlignmentOptions.Center;
 			countdownText.raycastTarget = false;
 			textObject.SetActive(true);
 
+			countdownBannerJuice = countdownBanner.AddComponent<PopupJuice>();
 			countdownBanner.SetActive(false);
 		}
 
@@ -893,7 +907,7 @@ namespace Dodad.XSplitscreen.Components
 			return false;
 		}
 
-		private static bool IsEmptyScreensPromptOpen => emptyScreensPrompt != null && emptyScreensPrompt.activeSelf;
+		private static bool IsEmptyScreensPromptOpen => emptyScreensPromptJuice && emptyScreensPromptJuice.IsShown;
 
 		private static bool IsEveryoneReadyWithEmptyScreens()
 		{
@@ -910,13 +924,19 @@ namespace Dodad.XSplitscreen.Components
 
 			if (shouldShow != IsEmptyScreensPromptOpen)
 			{
-				emptyScreensPrompt.SetActive(shouldShow);
 				emptyScreensPromptShownAt = Time.unscaledTime;
 
 				if (shouldShow)
+				{
+					emptyScreensPromptJuice.Show();
+					emptyScreensPromptJuice.Shake();
 					PauseSlots();
+				}
 				else
+				{
+					emptyScreensPromptJuice.Hide();
 					ResumeSlotsShortly();
+				}
 			}
 
 			// (specter) Ignore input briefly, since the press that claimed the last region is still held
@@ -931,7 +951,7 @@ namespace Dodad.XSplitscreen.Components
 
 			emptyScreensAccepted = confirm;
 			emptyScreensDeclined = !confirm;
-			emptyScreensPrompt.SetActive(false);
+			emptyScreensPromptJuice.Hide();
 			ResumeSlotsShortly();
 
 			if (confirm)
@@ -977,6 +997,7 @@ namespace Dodad.XSplitscreen.Components
 			AddPromptText(Language.GetString("XSS_EMPTY_PROMPT_BODY"), 20, RoR2MutedColor);
 			AddPromptText($"{confirmGlyphs} {Language.GetString("XSS_CONFIRM")}      {declineGlyphs} {Language.GetString("XSS_DECLINE")}", 22, Color.white);
 
+			emptyScreensPromptJuice = emptyScreensPrompt.AddComponent<PopupJuice>();
 			emptyScreensPrompt.SetActive(false);
 		}
 
@@ -1002,24 +1023,44 @@ namespace Dodad.XSplitscreen.Components
 		{
 			if (countdownBanner == null) return;
 
-			string message = null;
+			// (specter) Everyone is ready but the layout still has regions nobody claimed
+			bool showEmptyScreens = !AllowLoad && emptyScreensDeclined && IsEveryoneReadyWithEmptyScreens();
 
-			if (AllowLoad)
+			if (!AllowLoad && !showEmptyScreens)
 			{
-				message = string.Format(Language.GetString("XSS_STARTING_IN"), Mathf.CeilToInt(loadTimer));
-			}
-			else
-			{
-				// (specter) Everyone is ready but the layout still has regions nobody claimed
-				if (emptyScreensDeclined && IsEveryoneReadyWithEmptyScreens())
-					message = Language.GetString("XSS_EMPTY_SCREENS");
+				countdownBannerJuice.Hide();
+				lastCountdownSecond = -1;
+				bannerShowsEmptyScreens = false;
+				return;
 			}
 
-			if (countdownBanner.activeSelf != (message != null))
-				countdownBanner.SetActive(message != null);
+			countdownBannerJuice.Show();
 
-			if (message != null)
-				countdownText.text = message;
+			if (showEmptyScreens)
+			{
+				if (!bannerShowsEmptyScreens)
+				{
+					bannerShowsEmptyScreens = true;
+					lastCountdownSecond = -1;
+					countdownText.text = Language.GetString("XSS_EMPTY_SCREENS");
+					countdownText.color = WarningColor;
+					countdownBannerJuice.Shake();
+				}
+
+				return;
+			}
+
+			bannerShowsEmptyScreens = false;
+			int second = Mathf.CeilToInt(loadTimer);
+
+			// (specter) Text only changes once a second, so it's rebuilt and pulsed on the tick
+			if (second != lastCountdownSecond)
+			{
+				lastCountdownSecond = second;
+				countdownText.text = string.Format(Language.GetString("XSS_STARTING_IN"), second);
+				countdownText.color = ConfirmColor;
+				countdownBannerJuice.Pulse();
+			}
 		}
 
 		public void HandleLoadGame()
