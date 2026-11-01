@@ -271,10 +271,15 @@ namespace Dodad.XSplitscreen.Components
 		public void ForceClose()
 		{
 			var list = ActiveList;
-			if (IsExpanded && list.Count > 0)
-				list[_configuratorIndex].ForceClose();
-
-			CleanupConfigurator();
+			try
+			{
+				if (IsExpanded && list.Count > 0)
+					list[_configuratorIndex].ForceClose();
+			}
+			finally
+			{
+				CleanupConfigurator();
+			}
 		}
 
 		#endregion
@@ -407,9 +412,16 @@ namespace Dodad.XSplitscreen.Components
 			if (!IsExpanded || list.Count == 0)
 				return;
 
-			list[_configuratorIndex].ForceClose();
-
-			CleanupConfigurator();
+			// (specter) throwing ForceClose would skip the cleanup step, leaving IsExpanded stuck true -
+			// every later button press then re-threw. Whoops.
+			try
+			{
+				list[_configuratorIndex].ForceClose();
+			}
+			finally
+			{
+				CleanupConfigurator();
+			}
 		}
 
 		/// <summary>

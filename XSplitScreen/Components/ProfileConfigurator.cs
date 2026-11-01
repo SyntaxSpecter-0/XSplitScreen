@@ -111,6 +111,7 @@ namespace Dodad.XSplitscreen.Components
 			string currentProfile = Options.Slot.Profile?.fileName;
 
 			_profileKeys = GetValidProfiles(currentProfile);
+			_profileIndex = 0;
 
 			// If the current profile exists in the pool, set it as the selected index
 			if (currentProfile != null)
@@ -141,7 +142,10 @@ namespace Dodad.XSplitscreen.Components
 		/// <returns></returns>
 		private string[] GetValidProfiles(string currentProfileFilename)
 		{
-			return _profileKeys = PlatformSystems.saveSystem.loadedUserProfiles.Keys
+			// (specter) This is called every frame by CanOpen()/UpdateNavigatorCount(), and
+			// assigning _profileKeys here shrank the array out from under _profileIndex
+			// whenever another slot claimed a profile.
+			return PlatformSystems.saveSystem.loadedUserProfiles.Keys
 				.Where(x =>
 					x == currentProfileFilename ||
 					!_activeProfiles.Contains(x)).ToArray();
@@ -153,7 +157,7 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		/// <summary>
-		/// Selects a profile and assigns it to the slot.
+		/// (specter) Selects a profile and assigns it to the slot.
 		/// </summary>
 		private void SelectProfile(string profileName)
 		{
@@ -189,6 +193,7 @@ namespace Dodad.XSplitscreen.Components
 				_activeProfiles.Remove(Options.Slot.Profile.fileName);
 
 			Options.Slot.Profile = null;
+			_isOpen = false;
 		}
 
 		#endregion
@@ -205,16 +210,35 @@ namespace Dodad.XSplitscreen.Components
 		{
 			Log.Print($" ------------ Button Press (south) (ConfiguratorUpdate '{transform.parent.parent.name}') ------------");
 
-			// Safety check in case there are no profiles
-			if (_profileKeys != null && _profileKeys.Length > 0)
+			SelectProfile(GetHighlightedProfile());
+		}
+
+		/// <summary>
+		/// (specter) The profile currently highlighted, or null if none are available. Re-validates against the
+		/// live list, since other slots can claim profiles (or this slot can be reset) while this
+		/// one is browsing, leaving _profileIndex pointing past the end.
+		/// </summary>
+		private string GetHighlightedProfile()
+		{
+			var valid = GetValidProfiles(Options.Slot.Profile?.fileName);
+
+			if (valid.Length == 0)
 			{
-				SelectProfile(_profileKeys[_profileIndex]);
+				_profileKeys = valid;
+				_profileIndex = 0;
+				return null;
 			}
-			else
-			{
-				// Handle the no-profile case
-				SelectProfile(null);
-			}
+
+			if (_profileKeys != null && _profileIndex >= 0 && _profileIndex < _profileKeys.Length
+				&& valid.Contains(_profileKeys[_profileIndex]))
+				return _profileKeys[_profileIndex];
+
+			// (specter) Highlighted profile was taken (or the list is stale) - fall back to the nearest valid one
+			_profileKeys = valid;
+			_profileIndex = Mathf.Clamp(_profileIndex, 0, valid.Length - 1);
+			UpdateProfileName();
+
+			return valid[_profileIndex];
 		}
 
 		// (specter) Claiming a screen counts as picking the profile the player is looking at
@@ -257,6 +281,8 @@ namespace Dodad.XSplitscreen.Components
 		private void SelectPreviousProfile()
 		{
 			Log.Print($" ------------ Button Press (previous) (ConfiguratorUpdate '{transform.parent.parent.name}') ------------");
+			if (_profileKeys == null || _profileKeys.Length == 0)
+				return;
 			_profileIndex = (int) Mathf.Clamp(_profileIndex - 1, 0, _profileKeys.Length - 1);
 			IsConfirmed = false;
 			UpdateProfileName();
@@ -268,6 +294,8 @@ namespace Dodad.XSplitscreen.Components
 		private void SelectNextProfile()
 		{
 			Log.Print($" ------------ Button Press (next) (ConfiguratorUpdate '{transform.parent.parent.name}') ------------");
+			if (_profileKeys == null || _profileKeys.Length == 0)
+				return;
 			_profileIndex = (int) Mathf.Clamp(_profileIndex + 1, 0, _profileKeys.Length - 1);
 			IsConfirmed = false;
 			UpdateProfileName();
@@ -282,10 +310,10 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void UpdateProfileName()
 		{
-			if (_profileKeys == null || _profileKeys.Length == 0)
+			if (_profileKeys == null || _profileKeys.Length == 0 || _profileIndex < 0 || _profileIndex >= _profileKeys.Length)
 				Options.SetMessage("XSS_CONFIG_PROFILE", new Color(1f, 1f, 0f));
 			else
-				Options.SetMessage(PlatformSystems.saveSystem.GetProfile(_profileKeys[_profileIndex]).name, new Color(1f, 1f, 0f));
+				Options.SetMessage(PlatformSystems.saveSystem.GetProfile(_profileKeys[_profileIndex])?.name, new Color(1f, 1f, 0f));
 		}
 
 		#endregion
