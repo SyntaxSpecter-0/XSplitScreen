@@ -27,8 +27,14 @@ namespace Dodad.XSplitscreen.Components
 		private float shakeElapsed = ShakeDuration;
 		private float pulseElapsed = PulseDuration;
 
-		private void Awake()
+		private void Awake() => EnsureInitialized();
+
+		// (specter) HideImmediate with group == null.
+		private void EnsureInitialized()
 		{
+			if (group != null)
+				return;
+
 			group = gameObject.EnsureComponent<CanvasGroup>();
 			group.alpha = 0f;
 			rect = (RectTransform) transform;
@@ -37,6 +43,8 @@ namespace Dodad.XSplitscreen.Components
 
 		public void Show()
 		{
+			EnsureInitialized();
+
 			if (IsShown)
 				return;
 
@@ -47,6 +55,8 @@ namespace Dodad.XSplitscreen.Components
 
 		public void Hide()
 		{
+			EnsureInitialized();
+
 			if (!IsShown)
 				return;
 
@@ -57,6 +67,8 @@ namespace Dodad.XSplitscreen.Components
 		// (specter) For leaving the menu, where Update stops before a fade could finish
 		public void HideImmediate()
 		{
+			EnsureInitialized();
+
 			IsShown = false;
 			fadeElapsed = FadeDuration;
 			group.alpha = 0f;
