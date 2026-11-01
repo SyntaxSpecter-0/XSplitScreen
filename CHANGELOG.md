@@ -1,5 +1,20 @@
 **4.1.2**
 
+- Fixed an error when backing out of the splitscreen menu or selecting a screen after resetting the screens, which could leave controller input unresponsive
+- Fixed an error when leaving the splitscreen menu before the empty-screens prompt or countdown had been shown
+- Fixed the controller and keyboard/mouse both controlling the first player when starting a game with Online enabled
+- Added a Log Channels > Input option that logs every button press, to help with bug reports
+
+**4.1.1**
+- Show the PS5 icon for DualSense controllers
+- Stop rendering the main menu scene behind the splitscreen menu
+- Fix errors when the cursor hovers the Game Mode arrows
+- Sprites now use a shared asset, `?? AddComponent` replaced with `EnsureComponent` in unity project.
+**Ask before starting with unassigned screens**
+- When everyone is ready but some screen regions have no player, a Confirm/Decline prompt now lets players start anyway,.
+- Make confirm/decline prompt appear over the region grid
+
+**4.1.0**
 - Redesigned the player configuration panel (profile, color, and trails tabs) by SyntaxSpecter
 - Controller button prompts now show the correct glyph for the connected gamepad (Xbox/PlayStation)
 - Updated README screenshots and gifs to match the new UI
