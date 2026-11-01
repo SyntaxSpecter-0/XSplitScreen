@@ -388,7 +388,11 @@ namespace Dodad.XSplitscreen.Components
 			if (myMainMenuController == mainMenuController)
 				myMainMenuController = null;
 
-			ReleaseAllControllersToMain();
+			// Starting an online game leaves this menu too (the lobby is another main menu screen). By then every
+			// local user already owns its devices, and handing them all to PlayerMain here put every controller
+			// on the first player alongside the keyboard and mouse. Only release when backing out.
+			if (!SplitscreenUserManager.IsSplitscreenEnabled)
+				ReleaseAllControllersToMain();
 
 			if (emptyScreensPromptJuice)
 				emptyScreensPromptJuice.HideImmediate();
