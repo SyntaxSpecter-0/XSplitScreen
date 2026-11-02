@@ -32,6 +32,8 @@ namespace Dodad.XSplitscreen
 
 		public const int HardMaxPlayers = 16;
 
+		internal static ConfigEntry<bool> ReduceShadowCascades;
+
 		//-----------------------------------------------------------------------------------------------------------
 
 		public static Plugin Singleton { get; private set; }
@@ -58,6 +60,10 @@ namespace Dodad.XSplitscreen
 
             if (!LoadLogger())
                 return;
+
+			ReduceShadowCascades = Config.Bind("Performance", "Reduce Shadow Cascades", true,
+				"With 3 or more players, use 2 shadow cascades instead of 4. Close-up shadows get slightly softer, " +
+				"and every player's camera draws its shadows half as many times.");
 
             if (!LoadAssets())
                 return;

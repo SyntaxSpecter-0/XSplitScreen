@@ -37,6 +37,8 @@ namespace Dodad.XSplitscreen
 			UpdateTranslucentImageHook(state);
 			UpdateSelectionRedirectHook(state);
 			UpdateOverlayDisplayHooks(state);
+			UpdateLodBiasHooks(state);
+			UpdateShadowCascades(state);
 		}
 
 		private static void ResizePlayerCount(bool state)
@@ -737,6 +739,86 @@ namespace Dodad.XSplitscreen
 
 			Log.Diag($"Moved '{canvas.name}' ({canvas.renderMode}) to display {canvas.worldCamera.targetDisplay}");
 			canvas.targetDisplay = canvas.worldCamera.targetDisplay;
+		}
+
+		private static float lodBiasBase;
+		private static bool lodBiasScaled;
+
+		private static void UpdateLodBiasHooks(bool isSplitscreenEnabled)
+		{
+			Camera.onPreCull -= Camera_OnPreCull;
+			Camera.onPostRender -= Camera_OnPostRender;
+			RestoreLodBias();
+
+			if (isSplitscreenEnabled)
+			{
+				Camera.onPreCull += Camera_OnPreCull;
+				Camera.onPostRender += Camera_OnPostRender;
+			}
+		}
+
+		// (specter) LOD picks detail by how tall a model looks in the viewport, so a half-height viewport drew
+		// full-screen detail into half the pixels. Scaling the bias by viewport height matches single player.
+		private static void Camera_OnPreCull(Camera camera)
+		{
+			RestoreLodBias();
+
+			float viewportHeight = camera.rect.height;
+
+			if (viewportHeight >= 0.99f)
+				return;
+
+			lodBiasBase = QualitySettings.lodBias;
+			QualitySettings.lodBias = lodBiasBase * viewportHeight;
+			lodBiasScaled = true;
+		}
+
+		private static void Camera_OnPostRender(Camera camera) => RestoreLodBias();
+
+		private static void RestoreLodBias()
+		{
+			if (!lodBiasScaled)
+				return;
+
+			QualitySettings.lodBias = lodBiasBase;
+			lodBiasScaled = false;
+		}
+
+		private static int savedShadowCascades = -1;
+		private static bool restoreCascadesOnQuit;
+
+		private static void UpdateShadowCascades(bool isSplitscreenEnabled)
+		{
+			if (!restoreCascadesOnQuit)
+			{
+				// (specter) The game saves shadow_cascades from QualitySettings, so quitting mid-session mustn't save ours
+				Application.quitting += RestoreShadowCascades;
+				restoreCascadesOnQuit = true;
+			}
+
+			if (!isSplitscreenEnabled)
+			{
+				RestoreShadowCascades();
+				return;
+			}
+
+			if (Plugin.ReduceShadowCascades.Value && SplitscreenUserManager.LocalUsers.Count >= 3 && QualitySettings.shadowCascades > 2)
+			{
+				savedShadowCascades = QualitySettings.shadowCascades;
+				QualitySettings.shadowCascades = 2;
+			}
+		}
+
+		private static void RestoreShadowCascades()
+		{
+			if (savedShadowCascades < 0)
+				return;
+
+			// Leave it alone if the player changed it in the settings during the session
+			if (QualitySettings.shadowCascades == 2)
+				QualitySettings.shadowCascades = savedShadowCascades;
+
+			savedShadowCascades = -1;
 		}
 	}
 }
