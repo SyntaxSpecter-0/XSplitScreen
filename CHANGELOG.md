@@ -2,27 +2,38 @@
 
 - Fixed an error when backing out of the splitscreen menu or selecting a screen after resetting the screens, which could leave controller input unresponsive.
 - Fixed an error when leaving the splitscreen menu before the empty-screens prompt or countdown had been shown.
-- Fixed an issue where the controller and keyboard/mouse would both control the first player when starting a game with Online enabled.
-- Added a `Log Channels > Input` option that logs every button press to help with bug reports.
+- Fixed the controller and keyboard/mouse both controlling the first player when starting a game with Online enabled.
+- Added a `Log Channels > Input` option that logs every button press, to help with bug reports.
 
 ## 4.1.1
 
+### Setup menu
+
+- Starting with empty screen regions now asks for confirmation first. Declining shows "Remove empty screens" until the extra regions are removed.
+- The confirm prompt and the countdown banner fade in, and the countdown pulses each second.
+- Claiming a screen now confirms the highlighted profile, instead of asking you to create one.
+- With a settings tab open, A only acts on the tab, and B closes the tab before it releases your screen.
+- The credits and the confirm prompt pause player input while open, so the button that closes them doesn't also claim or release a screen. Only joined players can answer the prompt; any controller can close the credits.
+- The d-pad now changes profile, colour and trail on Xbox controllers. The stick no longer changes them by accident.
+- The gamepad cursor can now reach the Game Mode and Credits buttons, and clicking Game Mode cycles it.
 - Added the PS5 icon for DualSense controllers.
-- Stopped rendering the main menu scene behind the splitscreen menu.
-- Fixed errors when the cursor hovers over the Game Mode arrows.
-- Sprites now use a shared asset (`AddComponent` replaced with `EnsureComponent` in the Unity project).
+- Fixed errors when the cursor hovers the Game Mode arrows.
+- The main menu scene is no longer rendered behind the splitscreen menu.
+- Softer, larger background dots that drift further.
 
-#### Ask before starting with unassigned screens
+### In game
 
-- When everyone is ready but some screen regions have no player, a Confirm/Decline prompt now lets players start anyway.
-- Made the Confirm/Decline prompt appear over the region grid.
+- Screen regions without a player stay black instead of smearing old frames.
+- The Artifacts, Expansions and Karma popouts and the crafting panel shrink to fit each player's screen and stay on screen.
+- Moving a player to another display keeps their slot at its normal size.
+- Fixed the Seeker's meditate arrows staying white while a dead player spectates them.
+- Fixed other players' input closing your Command or scrapper picker when LookingGlass is installed.
 
-#### Fix splitscreen picker, Seeker and lobby panel bugs
+### Translations and fixes
 
-- LookingGlass soft dependency: its "input closes menu" option reacted to every player's input. It now correctly uses input from the player who opened it.
-- Moving a player to another display no longer stretches their slot. Each display's canvas has its own scale factor.
-- Seeker meditate: A spectating player's HUD gets its own copy of the input overlay. This fixes an issue where the player who was Seeker saw only white icons, even when performing inputs correctly. All copies are now coloured.
-- Artifacts, Expansions, Karma popouts and the crafting panel are now fitted to the player's viewport using the new `FitToViewport` component. This replaces the old one-shot scaling.
+- Translated the remaining English text in Portuguese (Brazil) and French: the backup warning, display legend, Profile tab, Configure label and new prompts.
+- Language overrides with broken accents left by older versions are now ignored.
+- Fixed menu sprites being created again each time the menu opened and never freed.
 
 ## 4.1.0
 
