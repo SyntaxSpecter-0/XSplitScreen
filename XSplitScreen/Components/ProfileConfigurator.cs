@@ -77,7 +77,17 @@ namespace Dodad.XSplitscreen.Components
 			Options.SetMessage(text, color);
 		}
 
-		public override bool CanOpen() => GetValidProfiles(Options.Slot.Profile?.fileName).Length > 0;
+		// (specter) Runs every frame, so this checks without building the profile list
+		public override bool CanOpen()
+		{
+			string currentProfile = Options.Slot.Profile?.fileName;
+
+			foreach (var profile in PlatformSystems.saveSystem.loadedUserProfiles.Keys)
+				if (profile == currentProfile || !_activeProfiles.Contains(profile))
+					return true;
+
+			return false;
+		}
 		
 		/// <summary>
 		/// Opens the profile selector interface.
@@ -111,7 +121,6 @@ namespace Dodad.XSplitscreen.Components
 			string currentProfile = Options.Slot.Profile?.fileName;
 
 			_profileKeys = GetValidProfiles(currentProfile);
-			_profileIndex = 0;
 
 			// If the current profile exists in the pool, set it as the selected index
 			if (currentProfile != null)
@@ -157,7 +166,7 @@ namespace Dodad.XSplitscreen.Components
 		}
 
 		/// <summary>
-		/// (specter) Selects a profile and assigns it to the slot.
+		/// Selects a profile and assigns it to the slot.
 		/// </summary>
 		private void SelectProfile(string profileName)
 		{

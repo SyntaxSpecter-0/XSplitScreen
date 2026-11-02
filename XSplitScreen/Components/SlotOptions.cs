@@ -412,8 +412,7 @@ namespace Dodad.XSplitscreen.Components
 			if (!IsExpanded || list.Count == 0)
 				return;
 
-			// (specter) throwing ForceClose would skip the cleanup step, leaving IsExpanded stuck true -
-			// every later button press then re-threw. Whoops.
+			// (specter) Clean up even if ForceClose throws, or IsExpanded stays true and every later press throws again
 			try
 			{
 				list[_configuratorIndex].ForceClose();
