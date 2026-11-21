@@ -38,7 +38,6 @@ namespace Dodad.XSplitscreen
 			UpdateSelectionRedirectHook(state);
 			UpdateOverlayDisplayHooks(state);
 			UpdateLodBiasHooks(state);
-			UpdateShadowCascades(state);
 		}
 
 		private static void ResizePlayerCount(bool state)
@@ -743,12 +742,14 @@ namespace Dodad.XSplitscreen
 
 		private static float lodBiasBase;
 		private static bool lodBiasScaled;
+		private static int shadowCascadesBase;
+		private static bool shadowCascadesReduced;
 
 		private static void UpdateLodBiasHooks(bool isSplitscreenEnabled)
 		{
 			Camera.onPreCull -= Camera_OnPreCull;
 			Camera.onPostRender -= Camera_OnPostRender;
-			RestoreLodBias();
+			RestoreRenderQuality();
 
 			if (isSplitscreenEnabled)
 			{
@@ -761,7 +762,15 @@ namespace Dodad.XSplitscreen
 		// full-screen detail into half the pixels. Scaling the bias by viewport height matches single player.
 		private static void Camera_OnPreCull(Camera camera)
 		{
-			RestoreLodBias();
+			RestoreRenderQuality();
+
+			// (specter) Keep this override inside the render callback so RoR2 never saves it as the global setting.
+			if (Plugin.ReduceShadowCascades.Value && SplitscreenUserManager.LocalUsers.Count >= 3 && QualitySettings.shadowCascades > 2)
+			{
+				shadowCascadesBase = QualitySettings.shadowCascades;
+				QualitySettings.shadowCascades = 2;
+				shadowCascadesReduced = true;
+			}
 
 			float viewportHeight = camera.rect.height;
 
@@ -773,7 +782,18 @@ namespace Dodad.XSplitscreen
 			lodBiasScaled = true;
 		}
 
-		private static void Camera_OnPostRender(Camera camera) => RestoreLodBias();
+		private static void Camera_OnPostRender(Camera camera) => RestoreRenderQuality();
+
+		private static void RestoreRenderQuality()
+		{
+			RestoreLodBias();
+
+			if (!shadowCascadesReduced)
+				return;
+
+			QualitySettings.shadowCascades = shadowCascadesBase;
+			shadowCascadesReduced = false;
+		}
 
 		private static void RestoreLodBias()
 		{
@@ -782,43 +802,6 @@ namespace Dodad.XSplitscreen
 
 			QualitySettings.lodBias = lodBiasBase;
 			lodBiasScaled = false;
-		}
-
-		private static int savedShadowCascades = -1;
-		private static bool restoreCascadesOnQuit;
-
-		private static void UpdateShadowCascades(bool isSplitscreenEnabled)
-		{
-			if (!restoreCascadesOnQuit)
-			{
-				// (specter) The game saves shadow_cascades from QualitySettings, so quitting mid-session mustn't save ours
-				Application.quitting += RestoreShadowCascades;
-				restoreCascadesOnQuit = true;
-			}
-
-			if (!isSplitscreenEnabled)
-			{
-				RestoreShadowCascades();
-				return;
-			}
-
-			if (Plugin.ReduceShadowCascades.Value && SplitscreenUserManager.LocalUsers.Count >= 3 && QualitySettings.shadowCascades > 2)
-			{
-				savedShadowCascades = QualitySettings.shadowCascades;
-				QualitySettings.shadowCascades = 2;
-			}
-		}
-
-		private static void RestoreShadowCascades()
-		{
-			if (savedShadowCascades < 0)
-				return;
-
-			// Leave it alone if the player changed it in the settings during the session
-			if (QualitySettings.shadowCascades == 2)
-				QualitySettings.shadowCascades = savedShadowCascades;
-
-			savedShadowCascades = -1;
 		}
 	}
 }
