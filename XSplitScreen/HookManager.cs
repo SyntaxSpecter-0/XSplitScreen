@@ -742,19 +742,28 @@ namespace Dodad.XSplitscreen
 
 		private static float lodBiasBase;
 		private static bool lodBiasScaled;
+		private static bool lodBiasScalingLogged;
 		private static int shadowCascadesBase;
 		private static bool shadowCascadesReduced;
+		private static bool shadowCascadesReductionLogged;
 
 		private static void UpdateLodBiasHooks(bool isSplitscreenEnabled)
 		{
 			Camera.onPreCull -= Camera_OnPreCull;
 			Camera.onPostRender -= Camera_OnPostRender;
+			Application.wantsToQuit -= Application_WantsToQuit;
+			Application.quitting -= Application_Quitting;
 			RestoreRenderQuality();
 
 			if (isSplitscreenEnabled)
 			{
+				lodBiasScalingLogged = false;
+				shadowCascadesReductionLogged = false;
 				Camera.onPreCull += Camera_OnPreCull;
 				Camera.onPostRender += Camera_OnPostRender;
+				Application.wantsToQuit += Application_WantsToQuit;
+				Application.quitting += Application_Quitting;
+				Log.Print($"Render settings enabled: lodBias={QualitySettings.lodBias}, shadowCascades={QualitySettings.shadowCascades}", Log.ELogChannel.Info);
 			}
 		}
 
@@ -770,6 +779,12 @@ namespace Dodad.XSplitscreen
 				shadowCascadesBase = QualitySettings.shadowCascades;
 				QualitySettings.shadowCascades = 2;
 				shadowCascadesReduced = true;
+
+				if (!shadowCascadesReductionLogged)
+				{
+					Log.Print($"Render settings reducing shadowCascades: {shadowCascadesBase} -> 2 for {SplitscreenUserManager.LocalUsers.Count} local users", Log.ELogChannel.Info);
+					shadowCascadesReductionLogged = true;
+				}
 			}
 
 			float viewportHeight = camera.rect.height;
@@ -778,11 +793,30 @@ namespace Dodad.XSplitscreen
 				return;
 
 			lodBiasBase = QualitySettings.lodBias;
-			QualitySettings.lodBias = lodBiasBase * viewportHeight;
+			QualitySettings.lodBias = lodBiasBase * Mathf.Pow(viewportHeight, Plugin.LodBiasScaling.Value);
 			lodBiasScaled = true;
+
+			if (!lodBiasScalingLogged)
+			{
+				Log.Print($"Render settings scaling lodBias: {lodBiasBase} -> {QualitySettings.lodBias} for viewport height {viewportHeight}", Log.ELogChannel.Info);
+				lodBiasScalingLogged = true;
+			}
 		}
 
 		private static void Camera_OnPostRender(Camera camera) => RestoreRenderQuality();
+
+		private static bool Application_WantsToQuit()
+		{
+			RestoreRenderQuality();
+			Log.Print($"Application.wantsToQuit restored render settings: lodBias={QualitySettings.lodBias}, shadowCascades={QualitySettings.shadowCascades}", Log.ELogChannel.Info);
+			return true;
+		}
+
+		private static void Application_Quitting()
+		{
+			RestoreRenderQuality();
+			Log.Print($"Application.quitting restored render settings: lodBias={QualitySettings.lodBias}, shadowCascades={QualitySettings.shadowCascades}", Log.ELogChannel.Info);
+		}
 
 		private static void RestoreRenderQuality()
 		{

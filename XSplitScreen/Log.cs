@@ -1,11 +1,12 @@
 ﻿using BepInEx.Logging;
+using System;
 
 namespace Dodad.XSplitscreen
 {
 	internal static class Log
 	{
 		private static ManualLogSource Source;
-		private static bool DebugEnabled;
+		private static ELogChannel ActiveChannels;
 
 		/// <summary>
 		/// True when the user enabled the Diagnostics option (extra reports for bug reports)
@@ -21,15 +22,14 @@ namespace Dodad.XSplitscreen
 		/// Initialize the logger with the plugin log source
 		/// </summary>
 		/// <param name="source"></param>
-		/// <param name="debug">Print Debug channel messages</param>
+		/// <param name="channels">Channels enabled in the config</param>
 		/// <param name="diagnostics">Print Diag messages</param>
-		/// <param name="input">Print Input messages (button presses)</param>
-		internal static void Init(ManualLogSource source, bool debug, bool diagnostics, bool input)
+		internal static void Init(ManualLogSource source, ELogChannel channels, bool diagnostics)
 		{
 			Source = source;
-			DebugEnabled = debug;
+			ActiveChannels = channels;
 			DiagnosticsEnabled = diagnostics;
-			InputEnabled = input;
+			InputEnabled = channels.HasFlag(ELogChannel.Input);
 		}
 
 		/// <summary>
@@ -39,7 +39,7 @@ namespace Dodad.XSplitscreen
 		/// <param name="channel"></param>
 		internal static void Print(object data, ELogChannel channel = ELogChannel.Debug)
 		{
-			if (Source == null)
+			if (Source == null || !ActiveChannels.HasFlag(channel))
 				return;
 
 			switch (channel)
@@ -60,12 +60,10 @@ namespace Dodad.XSplitscreen
 					Source.LogFatal(data);
 					break;
 				case ELogChannel.Debug:
-					if (DebugEnabled)
-						Source.LogDebug(data);
+					Source.LogDebug(data);
 					break;
 				case ELogChannel.Input:
-					if (InputEnabled)
-						Source.LogInfo($"[Input] {data}");
+					Source.LogInfo($"[Input] {data}");
 					break;
 			}
 		}
@@ -82,15 +80,18 @@ namespace Dodad.XSplitscreen
 			Source.LogInfo($"[Diagnostics] {data}");
 		}
 
+		[Flags]
 		internal enum ELogChannel
 		{
-			Message,
-			Info,
-			Warning,
-			Error,
-			Fatal,
-			Debug,
-			Input,
+			None = 0,
+			Message = 1 << 0,
+			Info = 1 << 1,
+			Warning = 1 << 2,
+			Error = 1 << 3,
+			Fatal = 1 << 4,
+			Debug = 1 << 5,
+			Input = 1 << 6,
+			All = Message | Info | Warning | Error | Fatal | Debug | Input,
 		}
 	}
 }

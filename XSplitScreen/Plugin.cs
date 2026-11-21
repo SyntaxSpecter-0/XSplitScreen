@@ -33,6 +33,7 @@ namespace Dodad.XSplitscreen
 		public const int HardMaxPlayers = 16;
 
 		internal static ConfigEntry<bool> ReduceShadowCascades;
+		internal static ConfigEntry<float> LodBiasScaling;
 
 		//-----------------------------------------------------------------------------------------------------------
 
@@ -56,14 +57,19 @@ namespace Dodad.XSplitscreen
             if (Singleton != null)
                 return;
 
-            Singleton = this;
+			Singleton = this;
 
-            if (!LoadLogger())
-                return;
-
-			ReduceShadowCascades = Config.Bind("Performance", "Reduce Shadow Cascades", true,
+			ReduceShadowCascades = BindMovedConfig("Performance", "1 Performance", "Reduce Shadow Cascades", true,
 				"With 3 or more players, use 2 shadow cascades instead of 4. Close-up shadows get slightly softer, " +
 				"and every player's camera draws its shadows half as many times.");
+
+			LodBiasScaling = BindMovedConfig("Performance", "1 Performance", "LOD Bias Scaling", 1f,
+				"Controls how strongly LOD bias follows viewport height. 0 disables scaling, 1 makes a half-height " +
+				"viewport use half the normal LOD bias, and 2 makes it use one quarter.",
+				new AcceptableValueRange<float>(0f, 4f));
+
+			if (!LoadLogger())
+				return;
 
             if (!LoadAssets())
                 return;
@@ -361,21 +367,60 @@ namespace Dodad.XSplitscreen
 		/// <returns></returns>
 		private static bool LoadLogger()
 		{
-			// Note: the old "Log Channels" section is no longer read (everything was on by default)
-
-			var debug = Singleton.Config.Bind("Logging", "Debug", false,
-				"Print verbose debug messages. Only useful for development.");
-
-			var diagnostics = Singleton.Config.Bind("Logging", "Diagnostics", false,
+			var legacyDebug = Singleton.Config.Bind("Logging", "Debug", false);
+			var legacyInput = Singleton.Config.Bind("Logging", "Input", false);
+			var diagnostics = BindMovedConfig("Logging", "2 Logging", "Diagnostics", false,
 				"Print extra information about controllers, players and menus. Turn this on when reporting a bug and include the log file.");
 
-			var input = Singleton.Config.Bind("Log Channels", "Input", false,
-				"Print a line for every button press, with the player, device and event system that received it. " +
-				"Very noisy - only turn this on when reporting an input bug");
+			var message = BindMovedConfig("Log Channels", "3 Log Channels", "Message", true,
+				"Print general plugin messages.");
+			var info = BindMovedConfig("Log Channels", "3 Log Channels", "Info", true,
+				"Print normal status and lifecycle information.");
+			var warning = BindMovedConfig("Log Channels", "3 Log Channels", "Warning", true,
+				"Print recoverable problems and compatibility warnings.");
+			var error = BindMovedConfig("Log Channels", "3 Log Channels", "Error", true,
+				"Print errors that prevent a feature from working correctly.");
+			var fatal = BindMovedConfig("Log Channels", "3 Log Channels", "Fatal", true,
+				"Print errors that prevent the plugin from loading correctly.");
+			var debug = BindMovedConfig("Log Channels", "3 Log Channels", "Debug", legacyDebug.Value,
+				"Print verbose development messages.");
+			var input = BindMovedConfig("Log Channels", "3 Log Channels", "Input", legacyInput.Value,
+				"Print every button press with the player, device and event system that received it. Very noisy.");
+			var all = BindMovedConfig("Log Channels", "3 Log Channels", "All", false,
+				"Enable every logging channel regardless of its individual setting.");
 
-			Log.Init(Singleton.Logger, debug.Value, diagnostics.Value, input.Value);
+			if (legacyDebug.Value)
+				debug.Value = true;
+			if (legacyInput.Value)
+				input.Value = true;
+
+			Singleton.Config.Remove(legacyDebug.Definition);
+			Singleton.Config.Remove(legacyInput.Definition);
+			Singleton.Config.Save();
+
+			Log.ELogChannel channels = Log.ELogChannel.None;
+			if (message.Value) channels |= Log.ELogChannel.Message;
+			if (info.Value) channels |= Log.ELogChannel.Info;
+			if (warning.Value) channels |= Log.ELogChannel.Warning;
+			if (error.Value) channels |= Log.ELogChannel.Error;
+			if (fatal.Value) channels |= Log.ELogChannel.Fatal;
+			if (debug.Value) channels |= Log.ELogChannel.Debug;
+			if (input.Value) channels |= Log.ELogChannel.Input;
+			if (all.Value) channels = Log.ELogChannel.All;
+
+			Log.Init(Singleton.Logger, channels, diagnostics.Value);
 
 			return true;
+		}
+
+		private static ConfigEntry<T> BindMovedConfig<T>(string oldSection, string newSection, string key,
+			T defaultValue, string description, AcceptableValueBase acceptableValues = null)
+		{
+			var oldEntry = Singleton.Config.Bind(oldSection, key, defaultValue);
+			var newEntry = Singleton.Config.Bind(newSection, key, oldEntry.Value,
+				new ConfigDescription(description, acceptableValues));
+			Singleton.Config.Remove(oldEntry.Definition);
+			return newEntry;
 		}
 
 		//-----------------------------------------------------------------------------------------------------------
