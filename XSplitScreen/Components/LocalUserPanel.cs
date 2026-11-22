@@ -107,7 +107,8 @@ namespace Dodad.XSplitscreen.Components
 
 		internal void TryAddControllersToSlot(Controller[] controllers)
 		{
-			if (LocalUserSlot.Instances.Count >= RoR2Application.maxLocalPlayers)
+			// (specter) Counts joined slots only, since every panel keeps an empty one
+			if (LocalUserSlot.Instances.Count(x => x.LocalPlayer != null) >= RoR2Application.maxLocalPlayers)
 				return;
 
 			foreach (var panel in Instances)
@@ -184,7 +185,7 @@ namespace Dodad.XSplitscreen.Components
 			// has its own scale factor, so keeping world scale would shrink or grow the slot.
 			slot.transform.SetParent(GetTargetColumn(), false);
 
-			if (transform.childCount == MAX_USERS)
+			if (FilledSlots == MAX_USERS)
 				Destroy(freeSlot.gameObject);
 			else
 				freeSlot.transform.SetAsLastSibling();

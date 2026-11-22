@@ -910,7 +910,8 @@ namespace Dodad.XSplitscreen
 
             var player = __instance.userData.players[2].Clone();
 
-            for (int e = 0; e < 14; e++)
+			// (specter) Up to Player17, since PlayerMain holds unclaimed devices in the setup menu and never takes a slot
+            for (int e = 0; e < 15; e++)
             {
                 var clone = player.Clone();
                 clone.name = $"Player{e + 3}";

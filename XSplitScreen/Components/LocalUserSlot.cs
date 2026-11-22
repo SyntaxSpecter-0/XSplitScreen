@@ -749,7 +749,7 @@ namespace Dodad.XSplitscreen.Components
 		/// </summary>
 		private void TryAddFreeSlotToPanel(LocalUserPanel panel)
 		{
-			if (panel.transform.childCount != LocalUserPanel.MAX_USERS)
+			if (panel.FilledSlots != LocalUserPanel.MAX_USERS)
 			{
 				var freeSlot = panel.GetFreeSlot();
 				if (freeSlot == null)

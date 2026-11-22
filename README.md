@@ -42,7 +42,7 @@ See [CHANGELOG.md](CHANGELOG.md) for a full list of changes between versions.
 - **Custom colors and trails** - pick a unique color and trail for each player's profile, through a tabbed panel UI redesigned by SyntaxSpecter
 - **On-screen controller button icons** for prompts, matching the controller each player is using
 - **Full controller support** - the entire menu can be navigated with a controller, the only exception being changing the game mode (planned to be fixed)
-- Theoretically supports up to 16 players in singleplayer or multiplayer
+- Supports up to 16 local players in theory, tested with up to 6
 
 ## FAQ
 
