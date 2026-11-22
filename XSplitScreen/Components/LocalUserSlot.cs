@@ -578,9 +578,9 @@ namespace Dodad.XSplitscreen.Components
 				_lbLabel.text = "Q";
 				_rbLabel.text = "E";
 				foreach (var label in _upArrowLabels)
-					label.text = "▲";
+					label.text = "W";
 				foreach (var label in _downArrowLabels)
-					label.text = "▼";
+					label.text = "S";
 			}
 
 			// (specter) Bumped up from the baked prefab sizes (9-15) - the configure menu's glyphs
@@ -1160,19 +1160,17 @@ namespace Dodad.XSplitscreen.Components
 
 				if (player.controllers.hasKeyboard)
 				{
-					// (specter) Keyboard scheme: Tab opens/closes the panel, Q/E switch tabs, Up/Down
-					// browse values (Profile/Trails), Left/Right scrub the hue (Color), Enter
-					// confirms, Escape cancels/closes. Arrow keys are no longer double-booked as
-					// confirm/cancel.
+					// (specter) Keyboard scheme sits under the left hand: Tab opens/closes the panel, Q/E switch tabs,
+					// W/S browse values (Profile/Trails), A/D scrub the hue (Color), Enter confirms, Escape closes.
 					LeftRightDelta +=
-						(player.controllers.Keyboard.GetKey(KeyCode.LeftArrow) ? -1 : 0)
+						(player.controllers.Keyboard.GetKey(KeyCode.A) ? -1 : 0)
 						+
-						(player.controllers.Keyboard.GetKey(KeyCode.RightArrow) ? 1 : 0);
+						(player.controllers.Keyboard.GetKey(KeyCode.D) ? 1 : 0);
 
 					UpDownDelta +=
-						(player.controllers.Keyboard.GetKey(KeyCode.DownArrow) ? -1 : 0)
+						(player.controllers.Keyboard.GetKey(KeyCode.S) ? -1 : 0)
 						+
-						(player.controllers.Keyboard.GetKey(KeyCode.UpArrow) ? 1 : 0);
+						(player.controllers.Keyboard.GetKey(KeyCode.W) ? 1 : 0);
 
 					var scrollDelta = player.controllers.Mouse.GetAxis(2);
 					UpDownDelta += scrollDelta;
@@ -1191,7 +1189,7 @@ namespace Dodad.XSplitscreen.Components
 				}
 
 				// (specter) Gamepad uses the d-pad while a panel is open, the stick otherwise.
-				// Keyboard always uses arrow keys (already folded into LeftRightDelta/UpDownDelta above).
+				// Keyboard always uses WASD (already folded into LeftRightDelta/UpDownDelta above).
 				bool useStick = player.controllers.hasKeyboard || !panelExpanded;
 				float navHorizontal = useStick ? LeftRightDelta : dpadHorizontal;
 				float navVertical = useStick ? UpDownDelta : dpadVertical;
