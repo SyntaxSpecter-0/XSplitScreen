@@ -82,8 +82,8 @@ namespace Dodad.XSplitscreen.Components
 		{
 			string currentProfile = Options.Slot.Profile?.fileName;
 
-			foreach (var profile in PlatformSystems.saveSystem.loadedUserProfiles.Keys)
-				if (profile == currentProfile || !_activeProfiles.Contains(profile))
+			foreach (var profile in PlatformSystems.saveSystem.loadedUserProfiles.Values)
+				if (IsSelectable(profile, currentProfile))
 					return true;
 
 			return false;
