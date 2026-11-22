@@ -831,18 +831,17 @@ namespace Dodad.XSplitscreen
 			}
 		}
 
-		private static void ProfileNameLabel_LateUpdate(RoR2.UI.ProfileNameLabel __instance)
+		private static void ProfileNameLabel_LateUpdate(RoR2.UI.ProfileNameLabel __instance, MPEventSystemLocator ___eventSystemLocator, TMPro.TextMeshProUGUI ___label)
 		{
-			var locator = __instance.GetComponent<MPEventSystemLocator>();
-			var localUser = locator?.eventSystem?.localUser;
-
-			if (localUser?.userProfile == null)
+			if (!SplitscreenUserManager.IsSplitscreenEnabled)
 				return;
 
-			var label = __instance.GetComponent<TMPro.TextMeshProUGUI>();
-			var token = __instance.token;
+			var profile = ___eventSystemLocator?.eventSystem?.localUser?.userProfile;
 
-			label.text = RoR2.Language.GetStringFormatted(token, localUser.userProfile.name);
+			if (profile == null)
+				return;
+
+			___label.text = RoR2.Language.GetStringFormatted(__instance.token, profile.name);
 		}
 
 		private static void CharacterSelectController_Awake(RoR2.UI.CharacterSelectController __instance)
