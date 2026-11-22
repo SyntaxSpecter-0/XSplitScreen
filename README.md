@@ -13,6 +13,10 @@ Splitscreen for Risk of Rain 2 with UI-based persistent preferences
 - R2API (Core, Language)
 - [GamepadFixes](https://thunderstore.io/c/riskofrain2/p/SyntaxSpecter/GamepadFixes/)
 
+## Recommended
+
+- [QuickRestart](https://thunderstore.io/c/riskofrain2/p/AceOfShades/QuickRestart/) - go back to character select after a run without setting up splitscreen again
+
 ## Installation
 
 Install with a mod manager such as [r2modman](https://thunderstore.io/package/ebkr/r2modman/) or [Thunderstore Mod Manager](https://www.overwolf.com/app/Thunderstore-Thunderstore_Mod_Manager) - dependencies above will be installed automatically. To install manually, place the mod and its dependencies in your `BepInEx/plugins` folder.
