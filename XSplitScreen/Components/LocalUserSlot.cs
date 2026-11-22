@@ -123,13 +123,6 @@ namespace Dodad.XSplitscreen.Components
 		public Action OnCancel;
 		public Action OnUnloadProfile;
 		public Action OnLoadProfile;
-		
-		// (specter) No-op stubs - the redesign dropped the dot indicator and the separate
-		// Confirm/Cancel buttons, but SlotOptions still calls these.
-		public int NavigatorCount { set { } }
-		public int NavigatorIndex { set { } }
-		public bool EnableConfirmButton { get; set; }
-		public bool EnableCancelButton { get; set; }
 
 		#endregion
 

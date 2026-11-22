@@ -72,16 +72,6 @@ namespace Dodad.XSplitscreen
 			CameraRect = data.CameraRect;
 			Display = data.Display;
 		}
-
-		/// <summary>
-		/// Gets a specific settings module for this user
-		/// </summary>
-		/// <typeparam name="T">Type of the settings module to retrieve</typeparam>
-		/// <returns>Settings module instance</returns>
-		public T GetSettingsModule<T>() where T : class, IUserSettingsModule, new()
-		{
-			return SplitScreenSettings.GetUserModule<T>(Profile.fileName);
-		}
 	}
 
 	/// <summary>

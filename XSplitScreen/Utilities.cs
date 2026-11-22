@@ -12,13 +12,7 @@ namespace Dodad.XSplitscreen
 {
 	internal static class Utilities
 	{
-		/// <summary>
-		/// Sets the child RectTransform to fill a percentage of the parent's area with a uniform margin.
-		/// For example, margin = 0.9 means the child fills 90% of parent (10% margin).
-		/// This preserves the aspect ratio correctly and centers the child in the parent.
-		/// </summary>
-		/// <param name="child">The child RectTransform to size</param>
-		/// <param name="fillRatio">The ratio of parent space to fill (0-1)</param>
+		// Centres child in its parent with marginPx on every side
 		public static void SetChildRectToPixelMargin(RectTransform child, float marginPx)
 		{
 			if (child == null) return;

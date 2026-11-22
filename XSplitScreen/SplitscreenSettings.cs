@@ -113,17 +113,6 @@ namespace Dodad.XSplitscreen
 		}
 
 		/// <summary>
-		/// Adds or updates a module for a user in memory (does not write to disk).
-		/// </summary>
-		public static void SetUserModule<T>(string fileName, T module) where T : IUserSettingsModule
-		{
-			var settings = GetUserSettings(fileName);
-			settings.Modules[module.ModuleKey] = module;
-			// Mark as dirty for batch saving
-			_dirtyUsers.Add(fileName);
-		}
-
-		/// <summary>
 		/// Gets a module for a user, or null if not found.
 		/// </summary>
 		public static T GetUserModule<T>(string fileName) where T : class, IUserSettingsModule, new()
@@ -199,7 +188,6 @@ namespace Dodad.XSplitscreen
 		/// </summary>
 		public static void MarkUserDirty(string fileName)
 		{
-			// Optionally: validate moduleKey exists
 			_dirtyUsers.Add(fileName);
 		}
 

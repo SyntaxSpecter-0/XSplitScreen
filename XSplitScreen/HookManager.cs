@@ -254,8 +254,8 @@ namespace Dodad.XSplitscreen
 
 				MatchPostProcessing(__instance);
 
-				var field = typeof(RunCameraManager).GetField("cameras", BindingFlags.Instance | BindingFlags.NonPublic);
-				var cameraDict = (Dictionary<string, CameraRigController>) field.GetValue(RunCameraManager.instance);
+				_runCameraManagerCamerasField ??= typeof(RunCameraManager).GetField("cameras", BindingFlags.Instance | BindingFlags.NonPublic);
+				var cameraDict = (Dictionary<string, CameraRigController>) _runCameraManagerCamerasField.GetValue(RunCameraManager.instance);
 				string userName = null;
 
 				foreach (var kvp in cameraDict)
