@@ -8,6 +8,8 @@
 		<AssemblyName>XSplitScreen</AssemblyName>
 		<RootNamespace>Dodad.XSplitscreen</RootNamespace>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<!-- R2API.Core brings in MMHOOK.RoR2, which only ships a .NET Framework build -->
+		<NoWarn>$(NoWarn);NU1701</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -28,7 +30,6 @@
 		<PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
 		<PackageReference Include="R2API.Core" Version="5.3.0" />
 		<PackageReference Include="R2API.Language" Version="1.1.0" />
-		<PackageReference Include="MMHOOK.RoR2" Version="2025.11.19" NoWarn="NU1701" />
 	</ItemGroup>
 
 	<!--
