@@ -367,48 +367,17 @@ namespace Dodad.XSplitscreen
 		/// <returns></returns>
 		private static bool LoadLogger()
 		{
-			var legacyDebug = Singleton.Config.Bind("Logging", "Debug", false);
-			var legacyInput = Singleton.Config.Bind("Logging", "Input", false);
+			// (specter) Message to Fatal always print, so bug reports never arrive with their errors hidden
 			var diagnostics = BindMovedConfig("Logging", "2 Logging", "Diagnostics", false,
 				"Print extra information about controllers, players and menus. Turn this on when reporting a bug and include the log file.");
-
-			var message = BindMovedConfig("Log Channels", "3 Log Channels", "Message", true,
-				"Print general plugin messages.");
-			var info = BindMovedConfig("Log Channels", "3 Log Channels", "Info", true,
-				"Print normal status and lifecycle information.");
-			var warning = BindMovedConfig("Log Channels", "3 Log Channels", "Warning", true,
-				"Print recoverable problems and compatibility warnings.");
-			var error = BindMovedConfig("Log Channels", "3 Log Channels", "Error", true,
-				"Print errors that prevent a feature from working correctly.");
-			var fatal = BindMovedConfig("Log Channels", "3 Log Channels", "Fatal", true,
-				"Print errors that prevent the plugin from loading correctly.");
-			var debug = BindMovedConfig("Log Channels", "3 Log Channels", "Debug", legacyDebug.Value,
+			var debug = BindMovedConfig("Logging", "3 Log Channels", "Debug", false,
 				"Print verbose development messages.");
-			var input = BindMovedConfig("Log Channels", "3 Log Channels", "Input", legacyInput.Value,
+			var input = BindMovedConfig("Log Channels", "3 Log Channels", "Input", false,
 				"Print every button press with the player, device and event system that received it. Very noisy.");
-			var all = BindMovedConfig("Log Channels", "3 Log Channels", "All", false,
-				"Enable every logging channel regardless of its individual setting.");
 
-			if (legacyDebug.Value)
-				debug.Value = true;
-			if (legacyInput.Value)
-				input.Value = true;
-
-			Singleton.Config.Remove(legacyDebug.Definition);
-			Singleton.Config.Remove(legacyInput.Definition);
 			Singleton.Config.Save();
 
-			Log.ELogChannel channels = Log.ELogChannel.None;
-			if (message.Value) channels |= Log.ELogChannel.Message;
-			if (info.Value) channels |= Log.ELogChannel.Info;
-			if (warning.Value) channels |= Log.ELogChannel.Warning;
-			if (error.Value) channels |= Log.ELogChannel.Error;
-			if (fatal.Value) channels |= Log.ELogChannel.Fatal;
-			if (debug.Value) channels |= Log.ELogChannel.Debug;
-			if (input.Value) channels |= Log.ELogChannel.Input;
-			if (all.Value) channels = Log.ELogChannel.All;
-
-			Log.Init(Singleton.Logger, channels, diagnostics.Value);
+			Log.Init(Singleton.Logger, debug.Value, diagnostics.Value, input.Value);
 
 			return true;
 		}
