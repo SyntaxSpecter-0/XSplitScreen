@@ -36,6 +36,7 @@ namespace Dodad.XSplitscreen
 			UpdateMeditateHook(state);
 			UpdateTranslucentImageHook(state);
 			UpdateSelectionRedirectHook(state);
+			UpdateOverlayDisplayHooks(state);
 		}
 
 		private static void ResizePlayerCount(bool state)
@@ -694,6 +695,48 @@ namespace Dodad.XSplitscreen
 
 			owner.SetSelectedGameObject(__0);
 			return false;
+		}
+
+		private static MethodInfo TooltipController_SetTooltip_Orig;
+		private static MethodInfo TooltipController_SetTooltip_Patch;
+		private static MethodInfo HighlightRect_Start_Orig;
+		private static MethodInfo HighlightRect_Start_Patch;
+		private static void UpdateOverlayDisplayHooks(bool isSplitscreenEnabled)
+		{
+			TooltipController_SetTooltip_Orig ??= typeof(TooltipController).GetMethod("SetTooltip", BindingFlags.Static | BindingFlags.Public);
+			TooltipController_SetTooltip_Patch ??= typeof(HookManager).GetMethod("TooltipController_SetTooltip", BindingFlags.Static | BindingFlags.NonPublic);
+			HighlightRect_Start_Orig ??= typeof(HighlightRect).GetMethod("Start", BindingFlags.Instance | BindingFlags.NonPublic);
+			HighlightRect_Start_Patch ??= typeof(HookManager).GetMethod("HighlightRect_Start", BindingFlags.Static | BindingFlags.NonPublic);
+
+			if (isSplitscreenEnabled)
+			{
+				Plugin.TryPatch(TooltipController_SetTooltip_Orig, postfix: TooltipController_SetTooltip_Patch);
+				Plugin.TryPatch(HighlightRect_Start_Orig, postfix: HighlightRect_Start_Patch);
+			}
+			else
+			{
+				Plugin.TryUnpatch(TooltipController_SetTooltip_Orig, TooltipController_SetTooltip_Patch);
+				Plugin.TryUnpatch(HighlightRect_Start_Orig, HighlightRect_Start_Patch);
+			}
+		}
+
+		private static void TooltipController_SetTooltip(MPEventSystem __0)
+		{
+			if (__0 && __0.currentTooltip)
+				MatchCanvasDisplay(__0.currentTooltip.GetComponent<Canvas>());
+		}
+
+		private static void HighlightRect_Start(HighlightRect __instance) => MatchCanvasDisplay(__instance.GetComponent<Canvas>());
+
+		// (specter) Tooltips and highlight boxes get their player's UI camera, but an overlay canvas still draws on
+		// display 0, so in multi-monitor mode they all landed on the primary monitor. Send them to the camera's display.
+		private static void MatchCanvasDisplay(Canvas canvas)
+		{
+			if (!canvas || !canvas.worldCamera || canvas.targetDisplay == canvas.worldCamera.targetDisplay)
+				return;
+
+			Log.Diag($"Moved '{canvas.name}' ({canvas.renderMode}) to display {canvas.worldCamera.targetDisplay}");
+			canvas.targetDisplay = canvas.worldCamera.targetDisplay;
 		}
 	}
 }
